@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useBancoMunay } from '@/contexts/banco-munay-context';
-import { formatSoles } from '@/lib/csv-storage';
+import { formatSoles, Student } from '@/lib/csv-storage';
 import { 
   Users, 
   UserPlus, 
@@ -28,7 +28,7 @@ export default function ListaAlumnosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [editForm, setEditForm] = useState({
     id: '',
     nombre: '',
@@ -43,7 +43,7 @@ export default function ListaAlumnosPage() {
   const totalBalance = students.reduce((sum, student) => sum + student.saldo, 0);
   const averageBalance = totalStudents > 0 ? totalBalance / totalStudents : 0;
 
-  const handleEditStudent = (student: any) => {
+  const handleEditStudent = (student: Student) => {
     setSelectedStudent(student);
     setEditForm({
       id: student.id,
@@ -64,7 +64,7 @@ export default function ListaAlumnosPage() {
     }
   };
 
-  const handleDeleteStudent = (student: any) => {
+  const handleDeleteStudent = (student: Student) => {
     setSelectedStudent(student);
     setIsDeleting(true);
   };
