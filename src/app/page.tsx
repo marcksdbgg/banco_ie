@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBancoMunay } from "@/contexts/banco-munay-context";
-import { Banknote, GraduationCap, Shield, Users } from "lucide-react";
+import { GraduationCap, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -26,11 +26,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <div className="bg-munay-blue text-white p-2 rounded-lg">
-                <Banknote className="h-6 w-6" />
-              </div>
+              <img src="/chitibank-logo.jpeg" alt="Chitibank Logo" className="h-12 w-auto" />
               <div>
-                <h1 className="text-xl font-bold text-munay-blue">Banco Munay</h1>
+                <h1 className="text-xl font-bold text-munay-blue">Chitibank</h1>
                 <p className="text-xs text-gray-600">Banco Escolar</p>
               </div>
             </div>
@@ -56,7 +54,7 @@ export default function HomePage() {
           
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
             Bienvenidos a{" "}
-            <span className="text-munay-blue">Banco Munay</span>
+            <span className="text-munay-blue">Chitibank</span>
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
@@ -81,7 +79,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              ¿Por qué elegir Banco Munay?
+              ¿Por qué elegir Chitibank?
             </h2>
             <p className="text-xl text-gray-600">
               Una plataforma diseñada específicamente para la educación financiera estudiantil
@@ -141,7 +139,7 @@ export default function HomePage() {
             ¿Listo para comenzar tu educación financiera?
           </h2>
           <p className="text-xl mb-8 text-blue-100">
-            Únete a miles de estudiantes que ya están aprendiendo sobre finanzas con Banco Munay
+            Únete a miles de estudiantes que ya están aprendiendo sobre finanzas con Chitibank
           </p>
           <Button size="lg" variant="munayGreen" asChild>
             <Link href="/auth/register">Crear Cuenta Gratuita</Link>
@@ -155,15 +153,15 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-3 mb-4 md:mb-0">
               <div className="bg-munay-blue text-white p-2 rounded-lg">
-                <Banknote className="h-6 w-6" />
+                <img src="/chitibank-logo.jpeg" alt="Chitibank Logo" className="h-8 w-auto" />
               </div>
               <div>
-                <h3 className="text-lg font-bold">Banco Munay</h3>
+                <h3 className="text-lg font-bold">Chitibank</h3>
                 <p className="text-sm text-gray-400">Educación financiera escolar</p>
               </div>
             </div>
             <div className="text-sm text-gray-400">
-              © 2025 Banco Munay. Proyecto educativo sin fines comerciales.
+              © 2025 Chitibank. Proyecto educativo sin fines comerciales.
             </div>
           </div>
         </div>

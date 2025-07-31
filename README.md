@@ -1,21 +1,21 @@
-# 🏦 Banco Munay - Sistema Bancario Educativo
+
+# 🏦 Chitibank - Sistema Bancario Educativo
 
 Una aplicación web educativa que simula un banco escolar, permitiendo a profesores gestionar cuentas de estudiantes y enseñar conceptos básicos de educación financiera.
 
 ## 🎯 Características
 
 ### ✨ Funcionalidades Principales
-- **Landing Page** con branding del Banco Munay
+- **Landing Page** con branding de Chitibank
 - **Sistema de Autenticación** simple (sin validaciones reales)
 - **Panel Administrativo** completo con:
-  - Dashboard con estadísticas
-  - Formulario para registrar nuevos alumnos
-  - Lista completa de estudiantes con búsqueda y filtros
+   - Dashboard con estadísticas
+   - Formulario para registrar nuevos alumnos
+   - Lista completa de estudiantes con búsqueda y filtros
 - **Persistencia de Datos** en localStorage
 - **Diseño Responsive** móvil-first
 - **Interfaz Intuitiva** con shadcn/ui
 
-### 🎨 Diseño
 - **Paleta de colores**: Azul #1e3a8a (principal) y Verde #16a34a (acento)
 - **Tipografía**: Geist Sans optimizada
 - **Componentes**: shadcn/ui para consistencia
@@ -252,4 +252,4 @@ Si encuentras algún problema o tienes sugerencias:
 
 ---
 
-**¡Que disfrutes explorando el mundo de la educación financiera con Banco Munay! 🏦✨**
+**¡Que disfrutes explorando el mundo de la educación financiera con Chitibank! 🏦✨**

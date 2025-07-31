@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useBancoMunay } from '@/contexts/banco-munay-context';
 import { 
-  Banknote, 
   LayoutDashboard, 
   UserPlus, 
   Users, 
@@ -53,11 +52,9 @@ export default function AdminNavigation() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/admin" className="flex items-center space-x-3">
-            <div className="bg-munay-blue text-white p-2 rounded-lg">
-              <Banknote className="h-6 w-6" />
-            </div>
+            <img src="/chitibank-logo.jpeg" alt="Chitibank Logo" className="h-10 w-auto" />
             <div>
-              <h1 className="text-xl font-bold text-munay-blue">Banco Munay</h1>
+              <h1 className="text-xl font-bold text-munay-blue">Chitibank</h1>
               <p className="text-xs text-gray-600">Panel Administrativo</p>
             </div>
           </Link>

@@ -14,8 +14,8 @@ export interface AuthData {
 
 // Local Storage Keys (mantenemos para auth)
 export const STORAGE_KEYS = {
-  AUTH: 'banco_munay_auth',
-} as const;
+  AUTH: 'chitibank_auth'
+};
 
 // CSV Headers
 const CSV_HEADERS = 'id,nombre,saldo,fechaCreacion';
@@ -106,7 +106,7 @@ export function downloadStudentsCSV(students: Student[]): void {
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
-  link.setAttribute('download', `banco_munay_alumnos_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute('download', `chitibank_alumnos_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   
   document.body.appendChild(link);
@@ -156,7 +156,7 @@ export function getStudents(): Student[] {
   if (typeof window === 'undefined') return [];
   
   try {
-    const data = localStorage.getItem('banco_munay_students');
+  const data = localStorage.getItem('chitibank_students');
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Error reading students from localStorage:', error);
@@ -171,7 +171,7 @@ export function saveStudents(students: Student[]): void {
   if (typeof window === 'undefined') return;
   
   try {
-    localStorage.setItem('banco_munay_students', JSON.stringify(students));
+  localStorage.setItem('chitibank_students', JSON.stringify(students));
   } catch (error) {
     console.error('Error saving students to localStorage:', error);
   }
@@ -277,7 +277,7 @@ export function logout(): void {
  */
 export function clearAllData(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem('banco_munay_students');
+  localStorage.removeItem('chitibank_students');
   localStorage.removeItem(STORAGE_KEYS.AUTH);
 }
 
