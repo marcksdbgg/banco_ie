@@ -14,7 +14,7 @@ export interface AuthData {
 
 // Local Storage Keys (mantenemos para auth)
 export const STORAGE_KEYS = {
-  AUTH: 'chitibank_auth'
+  AUTH: 'chitiBank_auth'
 };
 
 // CSV Headers
@@ -106,7 +106,7 @@ export function downloadStudentsCSV(students: Student[]): void {
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
-  link.setAttribute('download', `chitibank_alumnos_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute('download', `chitiBank_alumnos_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   
   document.body.appendChild(link);
@@ -156,7 +156,7 @@ export function getStudents(): Student[] {
   if (typeof window === 'undefined') return [];
   
   try {
-  const data = localStorage.getItem('chitibank_students');
+  const data = localStorage.getItem('chitiBank_students');
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Error reading students from localStorage:', error);
@@ -171,7 +171,7 @@ export function saveStudents(students: Student[]): void {
   if (typeof window === 'undefined') return;
   
   try {
-  localStorage.setItem('chitibank_students', JSON.stringify(students));
+  localStorage.setItem('chitiBank_students', JSON.stringify(students));
   } catch (error) {
     console.error('Error saving students to localStorage:', error);
   }
@@ -277,7 +277,7 @@ export function logout(): void {
  */
 export function clearAllData(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem('chitibank_students');
+  localStorage.removeItem('chitiBank_students');
   localStorage.removeItem(STORAGE_KEYS.AUTH);
 }
 

@@ -14,8 +14,8 @@ export interface AuthData {
 
 // Local Storage Keys
 export const STORAGE_KEYS = {
-  STUDENTS: 'chitibank_students',
-  AUTH: 'chitibank_auth'
+  STUDENTS: 'chitiBank_students',
+  AUTH: 'chitiBank_auth'
 };
 
 /**

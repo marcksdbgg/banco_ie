@@ -15,7 +15,7 @@ import {
   saveStudents
 } from '@/lib/csv-storage';
 
-interface ChitibankContextType {
+interface ChitiBankContextType {
   // Students
   students: Student[];
   addStudent: (nombre: string, montoInicial: number) => void;
@@ -36,7 +36,7 @@ interface ChitibankContextType {
   loading: boolean;
 }
 
-const ChitibankContext = createContext<ChitibankContextType | undefined>(undefined);
+const ChitiBankContext = createContext<ChitiBankContextType | undefined>(undefined);
 
 export function BancoMunayProvider({ children }: { children: React.ReactNode }) {
   const [students, setStudents] = useState<Student[]>([]);
@@ -122,14 +122,14 @@ export function BancoMunayProvider({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <ChitibankContext.Provider value={value}>
+  <ChitiBankContext.Provider value={value}>
       {children}
-    </ChitibankContext.Provider>
+  </ChitiBankContext.Provider>
   );
 }
 
 export function useBancoMunay() {
-  const context = useContext(ChitibankContext);
+  const context = useContext(ChitiBankContext);
   if (context === undefined) {
     throw new Error('useBancoMunay must be used within a BancoMunayProvider');
   }
