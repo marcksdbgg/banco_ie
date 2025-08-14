@@ -68,6 +68,9 @@ export default function HomePage() {
               <Link href="/auth/register">Comenzar Ahora</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
+              <Link href="/documentos">Repositorio de Documentos</Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
               <Link href="/auth/login">Acceso Administrativo</Link>
             </Button>
           </div>
