@@ -33,8 +33,9 @@ export default function DocumentosPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error || 'Error fetching');
         setItems(json.items || []);
-      } catch (err: any) {
-        setError(String(err.message || err));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
       } finally {
         setLoading(false);
       }

@@ -75,14 +75,15 @@ export async function GET(request: Request) {
           }
           if (results.length >= maxItems) break;
         }
-      } catch (err) {
+      } catch {
         // ignore folder errors but record a placeholder
         results.push({ id: folderId, name: `__error_loading_${folderId}__`, type: 'folder', parent: null });
       }
     }
 
     return NextResponse.json({ items: results });
-  } catch (error: any) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
