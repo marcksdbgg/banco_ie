@@ -34,17 +34,17 @@ export default function LoginPage() {
               <Banknote className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Banco Munay</h1>
+              <h1 className="text-2xl font-bold">ChitiBank</h1>
               <p className="text-sm text-gray-600">Banco Escolar</p>
             </div>
           </Link>
         </div>
 
         <Card className="border-2 shadow-lg">
-          <CardHeader className="text-center">
+            <CardHeader className="text-center">
             <CardTitle className="text-2xl text-munay-blue">Iniciar Sesión</CardTitle>
             <CardDescription>
-              Accede a tu cuenta administrativa de Banco Munay
+              Accede a tu cuenta administrativa de ChitiBank
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -54,7 +54,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@bancomunay.edu"
+                  placeholder="admin@chitibank.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Banco Munay Brand Colors
+  // ChitiBank Brand Colors
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
