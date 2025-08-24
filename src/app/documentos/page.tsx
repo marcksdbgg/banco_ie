@@ -1,106 +1,149 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
-// Lista inicial basada en los links proporcionados. Los IDs pueden extraerse de los enlaces de Drive.
-const archivos = [
-  { nombre: 'Secundaria Módulo 1', id: '1VW5Dq4gn_gL2WqFx-DhfCcpNZfwGe4-h' },
-  // Si hay carpetas, podemos enlazarlas directamente a la carpeta de Drive usando "folders/{id}"
-  { nombre: 'Carpeta - Recursos', id: '1ekHg6goS20X0cQjqifb_Rc3QrtrZKxHM', isFolder: true },
-];
+type Item = {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  parent?: string | null;
+  href?: string;
+};
 
 export default function DocumentosPage() {
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const [previewIsFolder, setPreviewIsFolder] = useState(false);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string | null>(null);
 
-  const openPreview = (id: string, isFolder = false) => {
-    setPreviewId(id);
-    setPreviewIsFolder(isFolder);
+  // Root folder provided by the user
+  const ROOT_FOLDER = '1D75tarMF-L1ImsWw4XT00bpb4O8OcCLw';
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/drive-scrape?folderId=${ROOT_FOLDER}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Error fetching');
+        setItems(json.items || []);
+      } catch (err: any) {
+        setError(String(err.message || err));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchItems();
+  }, []);
+
+  const openPreview = (it: Item) => {
+    // Only attempt to preview files (not folders)
+    if (it.type === 'folder') return window.open(`https://drive.google.com/drive/folders/${it.id}`, '_blank', 'noopener');
+
+    // Infer preview URL by file ID and simple heuristics (PDF/images use file preview)
+    const previewUrl = `https://drive.google.com/file/d/${it.id}/preview`;
+    setPreviewSrc(previewUrl);
+    setPreviewName(it.name);
   };
 
   const closePreview = () => {
-    setPreviewId(null);
-    setPreviewIsFolder(false);
+    setPreviewSrc(null);
+    setPreviewName(null);
   };
+
+  const folders = items.filter(i => i.type === 'folder');
+  const files = items.filter(i => i.type === 'file');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Repositorio de Documentos</h1>
-            <p className="text-gray-600">Accede y previsualiza recursos educativos almacenados en Google Drive.</p>
+            <p className="text-gray-600">Accede y previsualiza recursos de la carpeta raíz de Drive (lectura pública mediante scraping).</p>
           </div>
           <div className="flex items-center space-x-3">
             <Link href="/">
               <Button variant="outline">Volver al inicio</Button>
             </Link>
-            <a href="https://drive.google.com/drive/folders/1ekHg6goS20X0cQjqifb_Rc3QrtrZKxHM" target="_blank" rel="noreferrer">
-              <Button variant="munay">Abrir carpeta en Drive</Button>
+            <a href={`https://drive.google.com/drive/folders/${ROOT_FOLDER}`} target="_blank" rel="noreferrer">
+              <Button variant="munay">Abrir carpeta raíz en Drive</Button>
             </a>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {archivos.map((a) => (
-            <Card key={a.id} className="border-2 hover:shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-munay-blue">{a.nombre}</CardTitle>
-                <CardDescription className="text-sm text-muted-foreground">
-                  {a.isFolder ? 'Carpeta de Drive' : 'Documento (vista previa disponible)'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-700">ID: {a.id}</div>
-                  <div className="flex items-center space-x-2">
-                    {a.isFolder ? (
-                      <a href={`https://drive.google.com/drive/folders/${a.id}`} target="_blank" rel="noreferrer">
-                        <Button variant="outline">Abrir carpeta</Button>
-                      </a>
-                    ) : (
-                      <Button variant="munay" onClick={() => openPreview(a.id)}>
-                        Ver documento
-                      </Button>
-                    )}
-                    <a href={a.isFolder ? `https://drive.google.com/drive/folders/${a.id}` : `https://drive.google.com/file/d/${a.id}/view`} target="_blank" rel="noreferrer">
-                      <Button variant="outline">Abrir en Drive</Button>
-                    </a>
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Carpetas ({folders.length})</h2>
+            <div className="text-sm text-muted-foreground">Archivos encontrados: {files.length}</div>
+          </div>
+
+          {loading && <div className="text-gray-600">Escaneando carpeta raíz, por favor espera...</div>}
+          {error && <div className="text-red-600">Error: {error}</div>}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {folders.map((f) => (
+              <Card key={`d-${f.id}`} className="border-2 hover:shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-munay-blue">{f.name}</CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground">Carpeta</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-700">ID: {f.id}</div>
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" onClick={() => window.open(`https://drive.google.com/drive/folders/${f.id}`, '_blank', 'noopener')}>Abrir carpeta</Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-4">Archivos</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {files.map((it) => (
+                <Card key={`f-${it.id}`} className="border-2 hover:shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-munay-blue">{it.name}</CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground">Archivo</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-700">ID: {it.id}</div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="munay" onClick={() => openPreview(it)}>Ver</Button>
+                        <a href={`https://drive.google.com/file/d/${it.id}/view`} target="_blank" rel="noreferrer">
+                          <Button variant="outline">Abrir en Drive</Button>
+                        </a>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Preview Dialog */}
-        <Dialog open={!!previewId} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <Dialog open={!!previewSrc} onOpenChange={(open) => { if (!open) closePreview(); }}>
           <DialogContent className="max-w-4xl w-full">
             <DialogHeader>
-              <DialogTitle>Previsualización</DialogTitle>
-              <DialogDescription>
-                Vista previa del recurso. Si el archivo no permite previsualización en Drive, se abrirá en una nueva pestaña.
-              </DialogDescription>
+              <DialogTitle>{previewName ?? 'Previsualización'}</DialogTitle>
+              <DialogDescription>Vista previa del recurso. Si el archivo no se puede embeber, se abrirá en Drive.</DialogDescription>
             </DialogHeader>
 
             <div className="h-[70vh]">
-              {previewId && !previewIsFolder ? (
-                // Usamos el visualizador embebido de Google Drive
-                <iframe
-                  title="drive-preview"
-                  src={`https://drive.google.com/file/d/${previewId}/preview`}
-                  className="w-full h-full border rounded-md"
-                />
-              ) : previewId && previewIsFolder ? (
-                <iframe
-                  title="drive-folder"
-                  src={`https://drive.google.com/drive/folders/${previewId}`}
-                  className="w-full h-full border rounded-md"
-                />
+              {previewSrc ? (
+                <iframe title="drive-preview" src={previewSrc} className="w-full h-full border rounded-md" />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">No hay archivo seleccionado</div>
               )}
@@ -108,8 +151,8 @@ export default function DocumentosPage() {
 
             <DialogFooter>
               <Button variant="outline" onClick={closePreview}>Cerrar</Button>
-              {previewId && (
-                <a href={previewIsFolder ? `https://drive.google.com/drive/folders/${previewId}` : `https://drive.google.com/file/d/${previewId}/view`} target="_blank" rel="noreferrer">
+              {previewSrc && (
+                <a href={previewSrc.replace('/preview', '/view')} target="_blank" rel="noreferrer">
                   <Button variant="munay">Abrir en Drive</Button>
                 </a>
               )}
