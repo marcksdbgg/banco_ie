@@ -18,8 +18,8 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        munay: "bg-munay-blue text-white shadow hover:bg-munay-blue/90",
-        munayGreen: "bg-munay-green text-white shadow hover:bg-munay-green/90",
+        chiti_bank: "bg-chiti_bank-blue text-white shadow hover:bg-chiti_bank-blue/90",
+        chiti_bankGreen: "bg-chiti_bank-green text-white shadow hover:bg-chiti_bank-green/90",
       },
       size: {
         default: "h-9 px-4 py-2",

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { useBancoMunay } from '@/contexts/banco-munay-context';
+import { useBancochiti_bank } from '@/contexts/banco-chiti_bank-context';
 import { 
   LayoutDashboard, 
   UserPlus, 
@@ -17,7 +17,7 @@ import { useState } from 'react';
 export default function AdminNavigation() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useBancoMunay();
+  const { logout } = useBancochiti_bank();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -54,7 +54,7 @@ export default function AdminNavigation() {
           <Link href="/admin" className="flex items-center space-x-3">
             <img src="/chitibank-logo.jpeg" alt="ChitiBank Logo" className="h-10 w-auto" />
             <div>
-              <h1 className="text-xl font-bold text-munay-blue">ChitiBank</h1>
+              <h1 className="text-xl font-bold text-chiti_bank-blue">ChitiBank</h1>
               <p className="text-xs text-gray-600">Panel Administrativo</p>
             </div>
           </Link>
@@ -69,8 +69,8 @@ export default function AdminNavigation() {
                   href={item.href}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     item.active
-                      ? 'bg-munay-blue text-white'
-                      : 'text-gray-600 hover:text-munay-blue hover:bg-blue-50'
+                      ? 'bg-chiti_bank-blue text-white'
+                      : 'text-gray-600 hover:text-chiti_bank-blue hover:bg-blue-50'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -117,8 +117,8 @@ export default function AdminNavigation() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       item.active
-                        ? 'bg-munay-blue text-white'
-                        : 'text-gray-600 hover:text-munay-blue hover:bg-blue-50'
+                        ? 'bg-chiti_bank-blue text-white'
+                        : 'text-gray-600 hover:text-chiti_bank-blue hover:bg-blue-50'
                     }`}
                   >
                     <Icon className="h-4 w-4" />

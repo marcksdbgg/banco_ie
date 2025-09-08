@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useBancoMunay } from '@/contexts/banco-munay-context';
+import { useBancochiti_bank } from '@/contexts/banco-chiti_bank-context';
 import { formatSoles } from '@/lib/csv-storage';
 import { 
   Users, 
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { students, exportToCSV, importFromCSV } = useBancoMunay();
+  const { students, exportToCSV, importFromCSV } = useBancochiti_bank();
 
   // Calcular estadísticas
   const totalStudents = students.length;
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
       value: totalStudents.toString(),
       description: 'Estudiantes registrados',
       icon: Users,
-      color: 'text-munay-blue',
+      color: 'text-chiti_bank-blue',
       bgColor: 'bg-blue-50'
     },
     {
@@ -49,7 +49,7 @@ export default function AdminDashboard() {
       value: formatSoles(totalBalance),
       description: 'Dinero total en el banco',
       icon: DollarSign,
-      color: 'text-munay-green',
+      color: 'text-chiti_bank-green',
       bgColor: 'bg-green-50'
     },
     {
@@ -103,14 +103,14 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-2 hover:border-munay-blue transition-colors">
+        <Card className="border-2 hover:border-chiti_bank-blue transition-colors">
           <CardHeader>
             <div className="flex items-center space-x-3">
-              <div className="bg-munay-blue text-white p-2 rounded-lg">
+              <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
                 <UserPlus className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle className="text-munay-blue">Registrar Nuevo Alumno</CardTitle>
+                <CardTitle className="text-chiti_bank-blue">Registrar Nuevo Alumno</CardTitle>
                 <CardDescription>
                   Añade un nuevo estudiante al sistema bancario
                 </CardDescription>
@@ -118,7 +118,7 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <Button variant="munay" asChild className="w-full">
+            <Button variant="chiti_bank" asChild className="w-full">
               <Link href="/admin/nuevo-alumno">
                 Nuevo Alumno
                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -127,14 +127,14 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 hover:border-munay-green transition-colors">
+        <Card className="border-2 hover:border-chiti_bank-green transition-colors">
           <CardHeader>
             <div className="flex items-center space-x-3">
-              <div className="bg-munay-green text-white p-2 rounded-lg">
+              <div className="bg-chiti_bank-green text-white p-2 rounded-lg">
                 <Users className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle className="text-munay-green">Ver Lista de Alumnos</CardTitle>
+                <CardTitle className="text-chiti_bank-green">Ver Lista de Alumnos</CardTitle>
                 <CardDescription>
                   Consulta y gestiona las cuentas existentes
                 </CardDescription>
@@ -142,7 +142,7 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <Button variant="munayGreen" asChild className="w-full">
+            <Button variant="chiti_bankGreen" asChild className="w-full">
               <Link href="/admin/lista-alumnos">
                 Ver Lista Completa
                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Banknote className="h-5 w-5 text-munay-blue" />
+            <Banknote className="h-5 w-5 text-chiti_bank-blue" />
             <span>Gestión de Datos</span>
           </CardTitle>
           <CardDescription>
@@ -189,7 +189,7 @@ export default function AdminDashboard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Banknote className="h-5 w-5 text-munay-blue" />
+            <Banknote className="h-5 w-5 text-chiti_bank-blue" />
             <span>Estudiantes Recientes</span>
           </CardTitle>
           <CardDescription>
@@ -205,7 +205,7 @@ export default function AdminDashboard() {
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="bg-munay-blue text-white p-2 rounded-full">
+                    <div className="bg-chiti_bank-blue text-white p-2 rounded-full">
                       <Users className="h-4 w-4" />
                     </div>
                     <div>
@@ -216,7 +216,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-munay-green">
+                    <p className="font-bold text-chiti_bank-green">
                       {formatSoles(student.saldo)}
                     </p>
                     <p className="text-xs text-gray-600">Saldo inicial</p>
@@ -236,7 +236,7 @@ export default function AdminDashboard() {
             <div className="text-center py-8">
               <Banknote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-4">No hay estudiantes registrados aún</p>
-              <Button variant="munay" asChild>
+              <Button variant="chiti_bank" asChild>
                 <Link href="/admin/nuevo-alumno">
                   Registrar Primer Alumno
                   <UserPlus className="h-4 w-4 ml-2" />

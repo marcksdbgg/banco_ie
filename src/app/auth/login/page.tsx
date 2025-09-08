@@ -64,8 +64,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-3 text-munay-blue hover:text-munay-blue/80 transition-colors">
-            <div className="bg-munay-blue text-white p-2 rounded-lg">
+          <Link href="/" className="inline-flex items-center space-x-3 text-chiti_bank-blue hover:text-chiti_bank-blue/80 transition-colors">
+            <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
               <Banknote className="h-6 w-6" />
             </div>
             <div>
@@ -77,7 +77,7 @@ export default function LoginPage() {
 
         <Card className="border-2 shadow-lg">
             <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-munay-blue">Iniciar Sesión</CardTitle>
+            <CardTitle className="text-2xl text-chiti_bank-blue">Iniciar Sesión</CardTitle>
             <CardDescription>
               Accede a tu cuenta de ChitiBank
             </CardDescription>
@@ -128,7 +128,7 @@ export default function LoginPage() {
 
               {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-              <Button type="submit" className="w-full" variant="munay" disabled={loading}>
+              <Button type="submit" className="w-full" variant="chiti_bank" disabled={loading}>
                 {loading ? 'Ingresando...' : 'Ingresar al Sistema'}
               </Button>
             </form>
@@ -136,7 +136,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 ¿No tienes cuenta?{' '}
-                <Link href="/auth/register" className="text-munay-blue hover:underline font-medium">
+                <Link href="/auth/register" className="text-chiti_bank-blue hover:underline font-medium">
                   Regístrate aquí
                 </Link>
               </p>
@@ -145,7 +145,7 @@ export default function LoginPage() {
         </Card>
 
         <div className="mt-6 text-center">
-          <Link href="/" className="text-sm text-gray-500 hover:text-munay-blue transition-colors">
+          <Link href="/" className="text-sm text-gray-500 hover:text-chiti_bank-blue transition-colors">
             ← Volver al inicio
           </Link>
         </div>

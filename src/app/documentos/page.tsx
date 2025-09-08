@@ -75,7 +75,7 @@ export default function DocumentosPage() {
               <Button variant="outline">Volver al inicio</Button>
             </Link>
             <a href={`https://drive.google.com/drive/folders/${ROOT_FOLDER}`} target="_blank" rel="noreferrer">
-              <Button variant="munay">Abrir carpeta raíz en Drive</Button>
+              <Button variant="chiti_bank">Abrir carpeta raíz en Drive</Button>
             </a>
           </div>
         </header>
@@ -93,7 +93,7 @@ export default function DocumentosPage() {
             {folders.map((f) => (
               <Card key={`d-${f.id}`} className="border-2 hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-munay-blue">{f.name}</CardTitle>
+                  <CardTitle className="text-chiti_bank-blue">{f.name}</CardTitle>
                   <CardDescription className="text-sm text-muted-foreground">Carpeta</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -114,14 +114,14 @@ export default function DocumentosPage() {
               {files.map((it) => (
                 <Card key={`f-${it.id}`} className="border-2 hover:shadow-lg">
                   <CardHeader>
-                    <CardTitle className="text-munay-blue">{it.name}</CardTitle>
+                    <CardTitle className="text-chiti_bank-blue">{it.name}</CardTitle>
                     <CardDescription className="text-sm text-muted-foreground">Archivo</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-700">ID: {it.id}</div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="munay" onClick={() => openPreview(it)}>Ver</Button>
+                        <Button variant="chiti_bank" onClick={() => openPreview(it)}>Ver</Button>
                         <a href={`https://drive.google.com/file/d/${it.id}/view`} target="_blank" rel="noreferrer">
                           <Button variant="outline">Abrir en Drive</Button>
                         </a>
@@ -154,7 +154,7 @@ export default function DocumentosPage() {
               <Button variant="outline" onClick={closePreview}>Cerrar</Button>
               {previewSrc && (
                 <a href={previewSrc.replace('/preview', '/view')} target="_blank" rel="noreferrer">
-                  <Button variant="munay">Abrir en Drive</Button>
+                  <Button variant="chiti_bank">Abrir en Drive</Button>
                 </a>
               )}
             </DialogFooter>

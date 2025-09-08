@@ -2,14 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useBancoMunay } from "@/contexts/banco-munay-context";
+import { useBancochiti_bank } from "@/contexts/banco-chiti_bank-context";
 import { GraduationCap, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function HomePage() {
-  const { auth } = useBancoMunay();
+  const { auth } = useBancochiti_bank();
   const router = useRouter();
 
   // Redirect if already logged in
@@ -28,7 +28,7 @@ export default function HomePage() {
             <div className="flex items-center space-x-3">
               <img src="/chitibank-logo.jpeg" alt="ChitiBank Logo" className="h-12 w-auto" />
               <div>
-                <h1 className="text-xl font-bold text-munay-blue">ChitiBank</h1>
+                <h1 className="text-xl font-bold text-chiti_bank-blue">ChitiBank</h1>
                 <p className="text-xs text-gray-600">Banco Escolar</p>
               </div>
             </div>
@@ -36,7 +36,7 @@ export default function HomePage() {
               <Button variant="outline" asChild>
                 <Link href="/auth/login">Iniciar Sesión</Link>
               </Button>
-              <Button variant="munay" asChild>
+              <Button variant="chiti_bank" asChild>
                 <Link href="/auth/register">Registrarse</Link>
               </Button>
             </div>
@@ -47,14 +47,14 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center space-x-2 bg-munay-green text-white px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center space-x-2 bg-chiti_bank-green text-white px-4 py-2 rounded-full text-sm font-medium mb-6">
             <GraduationCap className="h-4 w-4" />
             <span>Educación Financiera</span>
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
             Bienvenidos a{" "}
-            <span className="text-munay-blue">ChitiBank</span>
+            <span className="text-chiti_bank-blue">ChitiBank</span>
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
@@ -64,7 +64,7 @@ export default function HomePage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="munay" asChild>
+            <Button size="lg" variant="chiti_bank" asChild>
               <Link href="/auth/register">Comenzar Ahora</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
@@ -90,12 +90,12 @@ export default function HomePage() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="border-2 hover:border-munay-blue transition-colors">
+            <Card className="border-2 hover:border-chiti_bank-blue transition-colors">
               <CardHeader className="text-center">
-                <div className="bg-munay-blue text-white p-3 rounded-lg w-fit mx-auto mb-4">
+                <div className="bg-chiti_bank-blue text-white p-3 rounded-lg w-fit mx-auto mb-4">
                   <GraduationCap className="h-8 w-8" />
                 </div>
-                <CardTitle className="text-munay-blue">Educación Práctica</CardTitle>
+                <CardTitle className="text-chiti_bank-blue">Educación Práctica</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-center">
@@ -104,12 +104,12 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-2 hover:border-munay-green transition-colors">
+            <Card className="border-2 hover:border-chiti_bank-green transition-colors">
               <CardHeader className="text-center">
-                <div className="bg-munay-green text-white p-3 rounded-lg w-fit mx-auto mb-4">
+                <div className="bg-chiti_bank-green text-white p-3 rounded-lg w-fit mx-auto mb-4">
                   <Shield className="h-8 w-8" />
                 </div>
-                <CardTitle className="text-munay-green">Seguro y Confiable</CardTitle>
+                <CardTitle className="text-chiti_bank-green">Seguro y Confiable</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-center">
@@ -118,12 +118,12 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-2 hover:border-munay-blue transition-colors">
+            <Card className="border-2 hover:border-chiti_bank-blue transition-colors">
               <CardHeader className="text-center">
-                <div className="bg-munay-blue text-white p-3 rounded-lg w-fit mx-auto mb-4">
+                <div className="bg-chiti_bank-blue text-white p-3 rounded-lg w-fit mx-auto mb-4">
                   <Users className="h-8 w-8" />
                 </div>
-                <CardTitle className="text-munay-blue">Gestión Sencilla</CardTitle>
+                <CardTitle className="text-chiti_bank-blue">Gestión Sencilla</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-center">
@@ -136,7 +136,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-munay-blue text-white">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-chiti_bank-blue text-white">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">
             ¿Listo para comenzar tu educación financiera?
@@ -144,7 +144,7 @@ export default function HomePage() {
           <p className="text-xl mb-8 text-blue-100">
             Únete a miles de estudiantes que ya están aprendiendo sobre finanzas con ChitiBank
           </p>
-          <Button size="lg" variant="munayGreen" asChild>
+          <Button size="lg" variant="chiti_bankGreen" asChild>
             <Link href="/auth/register">Crear Cuenta Gratuita</Link>
           </Button>
         </div>
@@ -155,7 +155,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <div className="bg-munay-blue text-white p-2 rounded-lg">
+              <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
                 <img src="/chitibank-logo.jpeg" alt="ChitiBank Logo" className="h-8 w-auto" />
               </div>
               <div>

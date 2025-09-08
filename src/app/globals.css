@@ -29,8 +29,8 @@
     --radius: 0.5rem;
 
   /* ChitiBank Custom Variables */
-    --munay-blue: 225 100% 20%; /* #1e3a8a */
-    --munay-green: 142 76% 36%; /* #16a34a */
+    --chiti_bank-blue: 225 100% 20%; /* #1e3a8a */
+    --chiti_bank-green: 142 76% 36%; /* #16a34a */
   }
 
   .dark {
@@ -73,46 +73,46 @@
 }
 
 /* ChitiBank Custom Utility Classes */
-.bg-munay-blue {
+.bg-chiti_bank-blue {
   background-color: #1e3a8a !important;
 }
 
-.text-munay-blue {
+.text-chiti_bank-blue {
   color: #1e3a8a !important;
 }
 
-.bg-munay-green {
+.bg-chiti_bank-green {
   background-color: #16a34a !important;
 }
 
-.text-munay-green {
+.text-chiti_bank-green {
   color: #16a34a !important;
 }
 
-.hover\:bg-munay-blue\/90:hover {
+.hover\:bg-chiti_bank-blue\/90:hover {
   background-color: rgba(30, 58, 138, 0.9) !important;
 }
 
-.hover\:bg-munay-green\/90:hover {
+.hover\:bg-chiti_bank-green\/90:hover {
   background-color: rgba(22, 163, 74, 0.9) !important;
 }
 
-.hover\:text-munay-blue:hover {
+.hover\:text-chiti_bank-blue:hover {
   color: #1e3a8a !important;
 }
 
-.border-munay-blue {
+.border-chiti_bank-blue {
   border-color: #1e3a8a !important;
 }
 
-.border-munay-green {
+.border-chiti_bank-green {
   border-color: #16a34a !important;
 }
 
-.hover\:border-munay-blue:hover {
+.hover\:border-chiti_bank-blue:hover {
   border-color: #1e3a8a !important;
 }
 
-.hover\:border-munay-green:hover {
+.hover\:border-chiti_bank-green:hover {
   border-color: #16a34a !important;
 }

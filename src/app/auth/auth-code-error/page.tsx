@@ -21,7 +21,7 @@ export default function AuthErrorPage() {
           </p>
           <Link
             href="/auth/login"
-            className="mt-6 inline-block rounded-md bg-munay-blue px-4 py-2 text-sm font-medium text-white hover:bg-munay-blue/90"
+            className="mt-6 inline-block rounded-md bg-chiti_bank-blue px-4 py-2 text-sm font-medium text-white hover:bg-chiti_bank-blue/90"
           >
             Volver a Iniciar Sesión
           </Link>

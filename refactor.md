@@ -95,37 +95,68 @@ La lógica crítica se ejecutará en el servidor para mayor seguridad y consiste
         6.  Inserta un nuevo registro en la tabla `transacciones`.
     *   **Seguridad:** La función validará internamente los permisos del invocador.
 
+## 3. Plan de Backend con Edge Functions - *Acción Requerida*
+
+Se refina la lógica de las funciones para que sean más específicas y seguras.
+
+*   **Función `crear-usuario-cliente`** *(Lógica ya implementada, verificar y desplegar)*
+    *   **Propósito:** Permite a un `admin` crear una nueva cuenta de estudiante.
+    *   **Acción:** No requiere cambios en el código actual. Asegurarse de que utiliza claves de `SERVICE_ROLE_KEY` para tener permisos de administrador.
+
+*   **Función `gestionar-fondos` (Nueva)**
+    *   **Propósito:** Centraliza las operaciones de depósito y retiro realizadas por un `admin`.
+    *   **Disparador:** Llamada desde el frontend por un `admin`.
+    *   **Lógica:**
+        1.  Verificar que el invocador tiene el rol `admin`.
+        2.  Recibe `tipo_operacion` ('deposito' o 'retiro'), `cuenta_id`, `monto`.
+        3.  Valida que el `monto` sea positivo.
+        4.  Para retiros, verifica que la cuenta tenga saldo suficiente.
+        5.  Actualiza el `saldo_actual` en la tabla `cuentas`.
+        6.  Inserta un registro en `transacciones` con el tipo correspondiente.
+
+*   **Función `iniciar-transferencia-cliente` (Nueva)**
+    *   **Propósito:** Provee un endpoint seguro para que los clientes inicien transferencias.
+    *   **Disparador:** Llamada desde el frontend por un `cliente`.
+    *   **Lógica:**
+        1.  La función es un simple *wrapper* de seguridad.
+        2.  Recibe `cuenta_origen_id`, `numero_cuenta_destino`, `monto`.
+        3.  Verifica que el `auth.uid()` del usuario que llama coincide con el `usuario_id` de la `cuenta_origen_id`.
+        4.  Llama a la función de base de datos: `supabase.rpc('realizar_transferencia', { ...params })`.
+        5.  Devuelve el resultado o el error de la función RPC.
+
 ## 4. Plan de Refactorización del Frontend (Next.js)
 
-### 4.1. Configuración Inicial
-1.  **Instalar dependencias de Supabase:** `npm install @supabase/supabase-js @supabase/auth-helpers-nextjs`.
-2.  **Configurar Variables de Entorno:** Crear un archivo `.env.local` con `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-3.  **Crear el Cliente de Supabase:** Crear un archivo en `src/lib/supabase/client.ts` que configure el cliente de Supabase para componentes de cliente.
+### 4.1. Limpieza de Deuda Técnica
+1.  **Eliminar Contexto:** Borrar el archivo `src/contexts/banco-munay-context.tsx`.
+2.  **Eliminar Utilidades de Storage:** Borrar los archivos `src/lib/csv-storage.ts` y `src/lib/local-storage.ts`.
+3.  **Refactorizar Componentes:** Ir a cada componente que usaba `useBancoMunay` y prepararlo para recibir datos a través de `props` o para hacer sus propias llamadas a Supabase.
 
-### 4.2. Refactorización de Autenticación
-1.  **Eliminar lógica de `localStorage`:** Remover las funciones de `getAuthData` y `saveAuthData` de los archivos en `lib`.
-2.  **Actualizar Contexto Global:** El `ChitiBankProvider` ya no gestionará el estado de `auth`. En su lugar, se usará el cliente de Supabase directamente en los componentes o a través de hooks.
-3.  **Refactorizar Páginas de Auth (`/auth/login`, `/auth/register`):**
-    *   Reemplazar la lógica de `handleSubmit` con llamadas al cliente de Supabase: `supabase.auth.signInWithPassword()` y `supabase.auth.signUp()`.
-    *   El registro de administradores se puede manejar manualmente en Supabase o con una Edge Function protegida. El formulario de registro del frontend solo creará usuarios de tipo `cliente`.
-4.  **Actualizar Guardián de Rutas (`AdminGuard`):** Modificar `AdminGuard` para que verifique la sesión del usuario a través de Supabase y, además, consulte la tabla `perfiles` para confirmar que el `rol` es 'admin'. Crear un `ClientGuard` similar para las rutas de estudiante.
+### 4.2. Conexión del Panel de Administración
+1.  **`/admin/page.tsx` (Dashboard):**
+    *   Convertir a Server Component (`async function`).
+    *   Usar el `createClient` de `lib/supabase/server` para obtener las estadísticas (conteo de perfiles, suma de saldos) directamente en el servidor.
+2.  **`/admin/lista-alumnos/page.tsx`:**
+    *   Usar el cliente de servidor de Supabase para hacer un `fetch` inicial de los perfiles y sus cuentas asociadas: `supabase.from('perfiles').select('*, cuentas(*))'`.
+    *   La búsqueda y filtrado se pueden manejar en el cliente o con Server Actions para recargar los datos.
+3.  **`/admin/nuevo-alumno/page.tsx`:**
+    *   El `handleSubmit` del formulario debe invocar la Edge Function: `supabase.functions.invoke('crear-usuario-cliente', { body: formData })`.
+4.  **Añadir Depósitos/Retiros:**
+    *   En la `lista-alumnos`, añadir botones en cada fila para "Depositar" y "Retirar".
+    *   Estos botones abrirán un modal que pedirá el monto e invocará la Edge Function `gestionar-fondos`.
 
-### 4.3. Migración de Datos y Lógica
-1.  **Eliminar `csv-storage.ts` y `local-storage.ts`:** Toda la persistencia de datos ahora es responsabilidad de Supabase.
-2.  **Refactorizar Panel de Administración:**
-    *   **`/admin/lista-alumnos`**: Reemplazar la obtención de datos del contexto por una llamada directa a Supabase: `supabase.from('perfiles').select('*, cuentas(*))'`. Utilizar `react-query` o `SWR` para un manejo de datos más robusto (caching, re-fetching).
-    *   **`/admin/nuevo-alumno`**: El formulario ya no llamará a `addStudent` del contexto. En su lugar, invocará la Edge Function `crear-usuario-cliente` a través de `supabase.functions.invoke('crear-usuario-cliente', { body: { ... } })`.
-    *   **Diálogos de Editar/Eliminar**: Las acciones de estos diálogos invocarán las funciones de Supabase (`supabase.from('perfiles').update(...)`) o Edge Functions dedicadas si la lógica es compleja.
-
-### 4.4. Implementación de la Vista del Cliente
-1.  **Crear Nuevas Rutas:** Crear un nuevo grupo de rutas `src/app/(cliente)/dashboard`.
-2.  **Página Principal (`/dashboard`):**
-    *   **Componente de Saldo:** Mostrará el `saldo_actual` obtenido de la tabla `cuentas` del usuario logueado.
-    *   **Componente de Transacciones Recientes:** Hará una consulta a la tabla `transacciones` para mostrar los últimos 5-10 movimientos del usuario.
+### 4.3. Implementación del Portal del Cliente
+1.  **Crear Rutas del Cliente:**
+    *   Crear la estructura `src/app/(cliente)/dashboard` y `src/app/(cliente)/layout.tsx`.
+    *   El layout del cliente debe usar el `ClientGuard` para proteger las rutas.
+2.  **`/dashboard/page.tsx` (Dashboard del Cliente):**
+    *   Será un Server Component (`async`).
+    *   Obtendrá los datos de la cuenta del usuario logueado (`supabase.from('cuentas').select('*').eq('usuario_id', user.id)`).
+    *   Obtendrá las últimas 10 transacciones (`supabase.from('transacciones')...`).
+    *   Pasará estos datos a componentes de cliente para su renderización (Ej: `<BalanceCard saldo={...} />`, `<RecentTransactionsList transactions={...} />`).
 3.  **Página de Transferencias (`/dashboard/transferir`):**
-    *   Crear un formulario simple con campos para "Número de cuenta destino" y "Monto".
-    *   Al enviar, se invocará la Edge Function `realizar-transaccion` con el tipo 'transferencia'.
-    *   La UI/UX debe ser clara, mostrando confirmaciones y manejando errores de saldo insuficiente o cuenta inexistente.
+    *   Crear un formulario de cliente para la transferencia.
+    *   El `handleSubmit` del formulario invocará la Edge Function `iniciar-transferencia-cliente`.
+    *   Manejar la UI para estados de carga, éxito y error (ej. "Saldo insuficiente", "Cuenta no encontrada").
 
 ## 5. Hoja de Ruta Sugerida
 

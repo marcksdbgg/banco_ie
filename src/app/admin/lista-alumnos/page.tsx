@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useBancoMunay } from '@/contexts/banco-munay-context';
+import { useBancochiti_bank } from '@/contexts/banco-chiti_bank-context';
 import { formatSoles, Student } from '@/lib/csv-storage';
 import { 
   Users, 
@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export default function ListaAlumnosPage() {
-  const { students, exportToCSV, importFromCSV, updateStudent, deleteStudent } = useBancoMunay();
+  const { students, exportToCSV, importFromCSV, updateStudent, deleteStudent } = useBancochiti_bank();
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);

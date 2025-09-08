@@ -80,8 +80,8 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-3 text-munay-blue hover:text-munay-blue/80 transition-colors">
-            <div className="bg-munay-blue text-white p-2 rounded-lg">
+          <Link href="/" className="inline-flex items-center space-x-3 text-chiti_bank-blue hover:text-chiti_bank-blue/80 transition-colors">
+            <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
               <Banknote className="h-6 w-6" />
             </div>
             <div>
@@ -93,7 +93,7 @@ export default function RegisterPage() {
 
         <Card className="border-2 shadow-lg">
             <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-munay-blue">Crear Cuenta de Estudiante</CardTitle>
+            <CardTitle className="text-2xl text-chiti_bank-blue">Crear Cuenta de Estudiante</CardTitle>
             <CardDescription>
               Regístrate para obtener tu cuenta en ChitiBank.
             </CardDescription>
@@ -183,7 +183,7 @@ export default function RegisterPage() {
               {error && <p className="text-sm text-red-500 text-center">{error}</p>}
               {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200 text-center">{success}</p>}
 
-              <Button type="submit" className="w-full" variant="munay" disabled={loading}>
+              <Button type="submit" className="w-full" variant="chiti_bank" disabled={loading}>
                 {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
               </Button>
             </form>
@@ -191,7 +191,7 @@ export default function RegisterPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 ¿Ya tienes cuenta?{' '}
-                <Link href="/auth/login" className="text-munay-blue hover:underline font-medium">
+                <Link href="/auth/login" className="text-chiti_bank-blue hover:underline font-medium">
                   Inicia sesión aquí
                 </Link>
               </p>
@@ -200,7 +200,7 @@ export default function RegisterPage() {
         </Card>
 
         <div className="mt-6 text-center">
-          <Link href="/" className="text-sm text-gray-500 hover:text-munay-blue transition-colors">
+          <Link href="/" className="text-sm text-gray-500 hover:text-chiti_bank-blue transition-colors">
             ← Volver al inicio
           </Link>
         </div>
