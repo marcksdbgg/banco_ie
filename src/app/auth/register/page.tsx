@@ -7,35 +7,72 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useBancoMunay } from '@/contexts/banco-munay-context';
 import { Banknote, Eye, EyeOff, UserCheck } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    name: '',
+    fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    isAdmin: true, // Por defecto será admin
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { login } = useBancoMunay();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const supabase = createClient();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulamos registro - en un proyecto real aquí iría validación y guardado
-    login(formData.isAdmin);
-    router.push('/admin');
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setLoading(true);
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+    });
+
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('perfiles')
+        .insert({ 
+            id: data.user.id, 
+            nombre_completo: formData.fullName, 
+            rol: 'cliente' // All public registrations are 'cliente'
+        });
+
+      if (profileError) {
+        setError(`Error al crear el perfil: ${profileError.message}`);
+        // Consider deleting the auth user if profile creation fails to avoid orphaned users
+        await supabase.auth.admin.deleteUser(data.user.id);
+      } else {
+        setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
+        // Clear form
+        setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
+      }
+    }
+    setLoading(false);
   };
 
   return (
@@ -56,23 +93,24 @@ export default function RegisterPage() {
 
         <Card className="border-2 shadow-lg">
             <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-munay-blue">Crear Cuenta</CardTitle>
+            <CardTitle className="text-2xl text-munay-blue">Crear Cuenta de Estudiante</CardTitle>
             <CardDescription>
-              Regístrate para acceder al sistema de ChitiBank
+              Regístrate para obtener tu cuenta en ChitiBank.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre completo</Label>
+                <Label htmlFor="fullName">Nombre completo</Label>
                 <Input
-                  id="name"
-                  name="name"
+                  id="fullName"
+                  name="fullName"
                   type="text"
-                  placeholder="Profesor Juan Pérez"
-                  value={formData.name}
-                  onChange={handleInputChange}
+                  placeholder="Nombre del Estudiante"
+                  value={formData.fullName}
+                  onChange={handleChange}
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -82,10 +120,11 @@ export default function RegisterPage() {
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="profesor@escuela.edu"
+                  placeholder="estudiante@email.com"
                   value={formData.email}
-                  onChange={handleInputChange}
+                  onChange={handleChange}
                   required
+                  disabled={loading}
                 />
               </div>
               
@@ -98,8 +137,9 @@ export default function RegisterPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={formData.password}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                     required
+                    disabled={loading}
                   />
                   <Button
                     type="button"
@@ -107,12 +147,9 @@ export default function RegisterPage() {
                     size="icon"
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -126,8 +163,9 @@ export default function RegisterPage() {
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={formData.confirmPassword}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                     required
+                    disabled={loading}
                   />
                   <Button
                     type="button"
@@ -135,54 +173,20 @@ export default function RegisterPage() {
                     size="icon"
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={loading}
                   >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 bg-green-50 p-3 rounded-lg border border-green-200">
-                <input
-                  id="isAdmin"
-                  name="isAdmin"
-                  type="checkbox"
-                  checked={formData.isAdmin}
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-munay-green"
-                />
-                <Label htmlFor="isAdmin" className="text-sm text-green-800 flex items-center space-x-2">
-                  <UserCheck className="h-4 w-4" />
-                  <span>Registro como Administrador/Profesor</span>
-                </Label>
-              </div>
+              {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+              {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200 text-center">{success}</p>}
 
-              <Button type="submit" className="w-full" variant="munay">
-                Crear Cuenta
+              <Button type="submit" className="w-full" variant="munay" disabled={loading}>
+                {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
               </Button>
             </form>
-
-            <div className="mt-6 space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Demo Access</span>
-                </div>
-              </div>
-              
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-800 font-medium mb-2">Modo Demostración:</p>
-                <p className="text-xs text-blue-700">
-                  Esta es una demo educativa. Puedes usar cualquier información para registrarte.
-                  No se requieren datos reales ni validaciones.
-                </p>
-              </div>
-            </div>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">

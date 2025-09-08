@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { BancoMunayProvider as ChitiBankProvider } from "@/contexts/banco-munay-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChitiBank - Banco Escolar",
-  description: "Sistema educativo de gestión bancaria para estudiantes",
-  keywords: "banco escolar, educación financiera, ChitiBank",
+  title: "Chitibank - Banco Escolar",
+  description: "Una herramienta de educación financiera para colegios de primaria y secundaria.",
+  keywords: "banco escolar, educación financiera, Chitibank",
 };
 
 export default function RootLayout({
@@ -25,13 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-  <ChitiBankProvider>
-          {children}
-  </ChitiBankProvider>
+    <html lang="es" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body>
+        {children}
       </body>
     </html>
   );

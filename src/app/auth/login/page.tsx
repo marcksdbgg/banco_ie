@@ -7,21 +7,56 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useBancoMunay } from '@/contexts/banco-munay-context';
 import { Banknote, Eye, EyeOff } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useBancoMunay();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const supabase = createClient();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulamos login - en un proyecto real aquí iría validación
-    login(true); // Por defecto todos son admin
-    router.push('/admin');
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      // Check user role after successful login
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('perfiles')
+          .select('rol')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) {
+          setError("No se pudo verificar el rol del usuario.");
+          setLoading(false);
+        } else if (profile) {
+          if (profile.rol === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/dashboard'); // Assuming client route is /dashboard
+          }
+        }
+      } else {
+        setError("No se pudo obtener la información del usuario.");
+        setLoading(false);
+      }
+    }
   };
 
   return (
@@ -44,20 +79,21 @@ export default function LoginPage() {
             <CardHeader className="text-center">
             <CardTitle className="text-2xl text-munay-blue">Iniciar Sesión</CardTitle>
             <CardDescription>
-              Accede a tu cuenta administrativa de ChitiBank
+              Accede a tu cuenta de ChitiBank
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Correo electrónico</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@chitibank.edu"
+                  placeholder="tu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
               
@@ -71,6 +107,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={loading}
                   />
                   <Button
                     type="button"
@@ -78,6 +115,7 @@ export default function LoginPage() {
                     size="icon"
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -88,29 +126,12 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" variant="munay">
-                Ingresar al Sistema
+              {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+
+              <Button type="submit" className="w-full" variant="munay" disabled={loading}>
+                {loading ? 'Ingresando...' : 'Ingresar al Sistema'}
               </Button>
             </form>
-
-            <div className="mt-6 space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Demo Access</span>
-                </div>
-              </div>
-              
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-800 font-medium mb-2">Acceso de Demostración:</p>
-                <p className="text-xs text-blue-700">
-                  Puedes usar cualquier email y contraseña para acceder al sistema. 
-                  Esta es una demo educativa sin validaciones reales.
-                </p>
-              </div>
-            </div>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">

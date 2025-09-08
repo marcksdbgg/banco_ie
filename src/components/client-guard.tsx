@@ -4,17 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-export default function AdminGuard({ children }: { children: React.ReactNode }) {
+export default function ClientGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     const checkSession = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const { data: { user } } = await supabase.auth.getUser();
+      
       if (!user) {
         router.replace('/auth/login');
         return;
@@ -26,9 +24,9 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
         .eq('id', user.id)
         .single();
 
-      if (error || !profile || profile.rol !== 'admin') {
-        // Redirect to login or an unauthorized page if not an admin
-        router.replace('/auth/login');
+      if (error || !profile || profile.rol !== 'cliente') {
+        // Redirect to login or an unauthorized page if not a client
+        router.replace('/auth/login'); 
       } else {
         setIsAuthorized(true);
       }
@@ -40,9 +38,9 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   if (!isAuthorized) {
     // You can show a loading spinner here while checking the session
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p>Verificando acceso de administrador...</p>
-      </div>
+        <div className="flex h-screen items-center justify-center">
+            <p>Verificando acceso...</p>
+        </div>
     );
   }
 
