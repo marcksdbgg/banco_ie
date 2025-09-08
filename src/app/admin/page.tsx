@@ -26,7 +26,7 @@ async function getStats() {
     const { data: accounts, error: balanceError } = await supabase.from('cuentas').select('saldo_actual');
     if (balanceError) console.error("Error fetching balances:", balanceError);
     
-    const totalBalance = accounts?.reduce((acc, curr) => acc + (curr.saldo_actual ?? 0), 0) ?? 0;
+  const totalBalance = accounts?.reduce((acc, curr) => acc + (Number(curr.saldo_actual) || 0), 0) ?? 0;
     
     return {
         totalStudents: count ?? 0,
@@ -55,7 +55,7 @@ async function getRecentStudents() {
     id: profile.id,
     nombre: profile.nombre_completo,
     fechaCreacion: profile.fecha_creacion,
-    saldo: profile.cuentas?.[0]?.saldo_actual ?? 0,
+    saldo: Number(profile.cuentas?.[0]?.saldo_actual) || 0,
   }));
 }
 
