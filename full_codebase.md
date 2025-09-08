@@ -766,9 +766,7 @@ export default async function DashboardPage() {
 
 ## File: `src\app\(cliente)\dashboard\transferir\page.tsx`
 ```tsx
-"use client";
-
-export const dynamic = 'force-dynamic';
+'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -778,6 +776,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function TransferPage() {
     const router = useRouter();
@@ -921,10 +920,22 @@ export default function ClienteLayout({
 
 ## File: `src\app\admin\configuracion\page.tsx`
 ```tsx
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Settings } from "lucide-react";
 
-export default function ConfiguracionPage() {
+export default async function ConfiguracionPage() {
+    const supabase = await createClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+        return redirect("/auth/login");
+    }
+
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
@@ -949,6 +960,9 @@ export default function ConfiguracionPage() {
 
 ## File: `src\app\admin\layout.tsx`
 ```tsx
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 import AdminGuard from '@/components/admin-guard';
 import { AdminNavigation } from '@/components/admin-navigation';
 
@@ -1009,24 +1023,12 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     const [transactionForm, setTransactionForm] = useState({ tipo: 'deposito' as 'deposito' | 'retiro', monto: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
-    const supabase = createClient();
     const router = useRouter();
-
-    const filteredAlumnos = alumnos.filter(alumno =>
-        alumno.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
-        setSelectedAlumno(alumno);
-        if (type === 'edit') setEditForm({ nombre: alumno.nombre });
-        if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
-        setError('');
-        setModal(type);
-    };
 
     const handleUpdate = async () => {
         if (!selectedAlumno || !editForm.nombre.trim()) return;
         setIsSubmitting(true);
+        const supabase = createClient();
         const { error } = await supabase.from('perfiles').update({ nombre_completo: editForm.nombre.trim() }).eq('id', selectedAlumno.id);
         if (!error) {
             router.refresh();
@@ -1040,7 +1042,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     const confirmDelete = async () => {
         if (!selectedAlumno) return;
         setIsSubmitting(true);
-        // Debe ser una Edge Function por seguridad
+        const supabase = createClient();
         const { error } = await supabase.functions.invoke('borrar-usuario-cliente', { body: { userId: selectedAlumno.id } });
         if (!error) {
             router.refresh();
@@ -1058,6 +1060,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
             setError("Monto inválido."); return;
         }
         setIsSubmitting(true);
+        const supabase = createClient();
         const { error } = await supabase.functions.invoke('gestionar-fondos', {
             body: { tipo: transactionForm.tipo, cuenta_id: selectedAlumno.cuentaId, monto },
         });
@@ -1068,6 +1071,18 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
             setError(error.message);
         }
         setIsSubmitting(false);
+    };
+
+    const filteredAlumnos = alumnos.filter(alumno =>
+        alumno.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
+        setSelectedAlumno(alumno);
+        if (type === 'edit') setEditForm({ nombre: alumno.nombre });
+        if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
+        setError('');
+        setModal(type);
     };
 
     return (
@@ -1114,8 +1129,6 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
                     </Table>
                 </CardContent>
             </Card>
-
-            {/* Modals */}
             <Dialog open={!!modal} onOpenChange={(isOpen) => !isOpen && setModal(null)}>
                 <DialogContent>
                     {modal === 'edit' && <>
@@ -1202,6 +1215,7 @@ export default async function ListaAlumnosPage() {
 'use client';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -1209,7 +1223,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// import deferred in handler to avoid prerender env usage
+// CORRECCIÓN: Se añade la importación que faltaba del cliente de Supabase para el navegador.
+import { createClient } from '@/lib/supabase/client';
 import { UserPlus, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -1260,7 +1275,6 @@ export default function NuevoAlumnoPage() {
     setIsSubmitting(true);
     setErrors({});
     try {
-      const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
       const { data, error } = await supabase.functions.invoke('crear-usuario-cliente', {
         body: {
@@ -1689,6 +1703,9 @@ export async function GET(request: NextRequest) {
 ```tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -1706,12 +1723,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
+
+    const supabase = createClient();
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -1722,7 +1740,6 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      // Check user role after successful login
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile, error: profileError } = await supabase
@@ -1738,8 +1755,9 @@ export default function LoginPage() {
           if (profile.rol === 'admin') {
             router.push('/admin');
           } else {
-            router.push('/dashboard'); // Assuming client route is /dashboard
+            router.push('/dashboard');
           }
+          router.refresh(); 
         }
       } else {
         setError("No se pudo obtener la información del usuario.");
@@ -1751,7 +1769,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 text-chiti_bank-blue hover:text-chiti_bank-blue/80 transition-colors">
             <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
@@ -1763,7 +1780,6 @@ export default function LoginPage() {
             </div>
           </Link>
         </div>
-
         <Card className="border-2 shadow-lg">
             <CardHeader className="text-center">
             <CardTitle className="text-2xl text-chiti_bank-blue">Iniciar Sesión</CardTitle>
@@ -1785,7 +1801,6 @@ export default function LoginPage() {
                   disabled={loading}
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
@@ -1814,14 +1829,11 @@ export default function LoginPage() {
                   </Button>
                 </div>
               </div>
-
               {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-
               <Button type="submit" className="w-full" variant="chiti_bank" disabled={loading}>
                 {loading ? 'Ingresando...' : 'Ingresar al Sistema'}
               </Button>
             </form>
-
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 ¿No tienes cuenta?{' '}
@@ -1832,7 +1844,6 @@ export default function LoginPage() {
             </div>
           </CardContent>
         </Card>
-
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-gray-500 hover:text-chiti_bank-blue transition-colors">
             ← Volver al inicio
@@ -1842,15 +1853,16 @@ export default function LoginPage() {
     </div>
   );
 }
-
 ```
 
 ## File: `src\app\auth\register\page.tsx`
 ```tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 import { useState } from 'react';
-// import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1871,8 +1883,6 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // const router = useRouter();
-  const supabase = createClient();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -1891,6 +1901,8 @@ export default function RegisterPage() {
 
     setLoading(true);
 
+    const supabase = createClient();
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
@@ -1908,16 +1920,13 @@ export default function RegisterPage() {
         .insert({ 
             id: data.user.id, 
             nombre_completo: formData.fullName, 
-            rol: 'cliente' // All public registrations are 'cliente'
+            rol: 'cliente'
         });
 
       if (profileError) {
         setError(`Error al crear el perfil: ${profileError.message}`);
-        // Consider deleting the auth user if profile creation fails to avoid orphaned users
-        await supabase.auth.admin.deleteUser(data.user.id);
       } else {
         setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
-        // Clear form
         setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
       }
     }
@@ -1927,7 +1936,6 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 text-chiti_bank-blue hover:text-chiti_bank-blue/80 transition-colors">
             <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
@@ -1939,7 +1947,6 @@ export default function RegisterPage() {
             </div>
           </Link>
         </div>
-
         <Card className="border-2 shadow-lg">
             <CardHeader className="text-center">
             <CardTitle className="text-2xl text-chiti_bank-blue">Crear Cuenta de Estudiante</CardTitle>
@@ -1962,7 +1969,6 @@ export default function RegisterPage() {
                   disabled={loading}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="email">Correo electrónico</Label>
                 <Input
@@ -1976,7 +1982,6 @@ export default function RegisterPage() {
                   disabled={loading}
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
@@ -2002,7 +2007,6 @@ export default function RegisterPage() {
                   </Button>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
                 <div className="relative">
@@ -2028,15 +2032,12 @@ export default function RegisterPage() {
                   </Button>
                 </div>
               </div>
-
               {error && <p className="text-sm text-red-500 text-center">{error}</p>}
               {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200 text-center">{success}</p>}
-
               <Button type="submit" className="w-full" variant="chiti_bank" disabled={loading}>
                 {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
               </Button>
             </form>
-
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 ¿Ya tienes cuenta?{' '}
@@ -2047,7 +2048,6 @@ export default function RegisterPage() {
             </div>
           </CardContent>
         </Card>
-
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-gray-500 hover:text-chiti_bank-blue transition-colors">
             ← Volver al inicio
@@ -2057,7 +2057,6 @@ export default function RegisterPage() {
     </div>
   );
 }
-
 ```
 
 ## File: `src\app\documentos\page.tsx`
@@ -2694,10 +2693,10 @@ import { createClient } from '@/lib/supabase/client';
 export default function ClientGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const supabase = createClient();
 
   useEffect(() => {
     const checkSession = async () => {
+      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -2712,7 +2711,6 @@ export default function ClientGuard({ children }: { children: React.ReactNode })
         .single();
 
       if (error || !profile || profile.rol !== 'cliente') {
-        // Redirect to login or an unauthorized page if not a client
         router.replace('/auth/login'); 
       } else {
         setIsAuthorized(true);
@@ -2720,7 +2718,7 @@ export default function ClientGuard({ children }: { children: React.ReactNode })
     };
 
     checkSession();
-  }, [router, supabase]);
+  }, [router]);
 
   if (!isAuthorized) {
     // You can show a loading spinner here while checking the session
@@ -3239,6 +3237,7 @@ export {
 import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {
+  // Create a supabase client on the browser with project's credentials
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

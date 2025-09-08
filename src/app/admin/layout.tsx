@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 import AdminGuard from '@/components/admin-guard';
 import { AdminNavigation } from '@/components/admin-navigation';
 

@@ -7,10 +7,10 @@ import { createClient } from '@/lib/supabase/client';
 export default function ClientGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const supabase = createClient();
 
   useEffect(() => {
     const checkSession = async () => {
+      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -25,7 +25,6 @@ export default function ClientGuard({ children }: { children: React.ReactNode })
         .single();
 
       if (error || !profile || profile.rol !== 'cliente') {
-        // Redirect to login or an unauthorized page if not a client
         router.replace('/auth/login'); 
       } else {
         setIsAuthorized(true);
@@ -33,7 +32,7 @@ export default function ClientGuard({ children }: { children: React.ReactNode })
     };
 
     checkSession();
-  }, [router, supabase]);
+  }, [router]);
 
   if (!isAuthorized) {
     // You can show a loading spinner here while checking the session

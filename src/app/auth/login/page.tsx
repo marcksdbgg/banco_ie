@@ -1,5 +1,8 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -17,12 +20,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
+
+    const supabase = createClient();
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -33,7 +37,6 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      // Check user role after successful login
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile, error: profileError } = await supabase
@@ -49,8 +52,9 @@ export default function LoginPage() {
           if (profile.rol === 'admin') {
             router.push('/admin');
           } else {
-            router.push('/dashboard'); // Assuming client route is /dashboard
+            router.push('/dashboard');
           }
+          router.refresh(); 
         }
       } else {
         setError("No se pudo obtener la información del usuario.");
@@ -62,7 +66,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 text-chiti_bank-blue hover:text-chiti_bank-blue/80 transition-colors">
             <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
@@ -74,7 +77,6 @@ export default function LoginPage() {
             </div>
           </Link>
         </div>
-
         <Card className="border-2 shadow-lg">
             <CardHeader className="text-center">
             <CardTitle className="text-2xl text-chiti_bank-blue">Iniciar Sesión</CardTitle>
@@ -96,7 +98,6 @@ export default function LoginPage() {
                   disabled={loading}
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
@@ -125,14 +126,11 @@ export default function LoginPage() {
                   </Button>
                 </div>
               </div>
-
               {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-
               <Button type="submit" className="w-full" variant="chiti_bank" disabled={loading}>
                 {loading ? 'Ingresando...' : 'Ingresar al Sistema'}
               </Button>
             </form>
-
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 ¿No tienes cuenta?{' '}
@@ -143,7 +141,6 @@ export default function LoginPage() {
             </div>
           </CardContent>
         </Card>
-
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-gray-500 hover:text-chiti_bank-blue transition-colors">
             ← Volver al inicio

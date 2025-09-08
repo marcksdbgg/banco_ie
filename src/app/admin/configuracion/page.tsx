@@ -1,7 +1,19 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Settings } from "lucide-react";
 
-export default function ConfiguracionPage() {
+export default async function ConfiguracionPage() {
+    const supabase = await createClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+        return redirect("/auth/login");
+    }
+
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>

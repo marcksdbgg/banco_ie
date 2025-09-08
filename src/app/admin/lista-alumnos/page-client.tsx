@@ -34,24 +34,12 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     const [transactionForm, setTransactionForm] = useState({ tipo: 'deposito' as 'deposito' | 'retiro', monto: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
-    const supabase = createClient();
     const router = useRouter();
-
-    const filteredAlumnos = alumnos.filter(alumno =>
-        alumno.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
-        setSelectedAlumno(alumno);
-        if (type === 'edit') setEditForm({ nombre: alumno.nombre });
-        if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
-        setError('');
-        setModal(type);
-    };
 
     const handleUpdate = async () => {
         if (!selectedAlumno || !editForm.nombre.trim()) return;
         setIsSubmitting(true);
+        const supabase = createClient();
         const { error } = await supabase.from('perfiles').update({ nombre_completo: editForm.nombre.trim() }).eq('id', selectedAlumno.id);
         if (!error) {
             router.refresh();
@@ -65,7 +53,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     const confirmDelete = async () => {
         if (!selectedAlumno) return;
         setIsSubmitting(true);
-        // Debe ser una Edge Function por seguridad
+        const supabase = createClient();
         const { error } = await supabase.functions.invoke('borrar-usuario-cliente', { body: { userId: selectedAlumno.id } });
         if (!error) {
             router.refresh();
@@ -83,6 +71,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
             setError("Monto inválido."); return;
         }
         setIsSubmitting(true);
+        const supabase = createClient();
         const { error } = await supabase.functions.invoke('gestionar-fondos', {
             body: { tipo: transactionForm.tipo, cuenta_id: selectedAlumno.cuentaId, monto },
         });
@@ -93,6 +82,18 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
             setError(error.message);
         }
         setIsSubmitting(false);
+    };
+
+    const filteredAlumnos = alumnos.filter(alumno =>
+        alumno.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
+        setSelectedAlumno(alumno);
+        if (type === 'edit') setEditForm({ nombre: alumno.nombre });
+        if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
+        setError('');
+        setModal(type);
     };
 
     return (
@@ -139,8 +140,6 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
                     </Table>
                 </CardContent>
             </Card>
-
-            {/* Modals */}
             <Dialog open={!!modal} onOpenChange={(isOpen) => !isOpen && setModal(null)}>
                 <DialogContent>
                     {modal === 'edit' && <>

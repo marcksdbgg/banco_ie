@@ -1,7 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 import { useState } from 'react';
-// import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,8 +24,6 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // const router = useRouter();
-  const supabase = createClient();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -42,6 +42,8 @@ export default function RegisterPage() {
 
     setLoading(true);
 
+    const supabase = createClient();
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
@@ -59,16 +61,13 @@ export default function RegisterPage() {
         .insert({ 
             id: data.user.id, 
             nombre_completo: formData.fullName, 
-            rol: 'cliente' // All public registrations are 'cliente'
+            rol: 'cliente'
         });
 
       if (profileError) {
         setError(`Error al crear el perfil: ${profileError.message}`);
-        // Consider deleting the auth user if profile creation fails to avoid orphaned users
-        await supabase.auth.admin.deleteUser(data.user.id);
       } else {
         setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
-        // Clear form
         setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
       }
     }
@@ -78,7 +77,6 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 text-chiti_bank-blue hover:text-chiti_bank-blue/80 transition-colors">
             <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
@@ -90,7 +88,6 @@ export default function RegisterPage() {
             </div>
           </Link>
         </div>
-
         <Card className="border-2 shadow-lg">
             <CardHeader className="text-center">
             <CardTitle className="text-2xl text-chiti_bank-blue">Crear Cuenta de Estudiante</CardTitle>
@@ -113,7 +110,6 @@ export default function RegisterPage() {
                   disabled={loading}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="email">Correo electrónico</Label>
                 <Input
@@ -127,7 +123,6 @@ export default function RegisterPage() {
                   disabled={loading}
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
@@ -153,7 +148,6 @@ export default function RegisterPage() {
                   </Button>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
                 <div className="relative">
@@ -179,15 +173,12 @@ export default function RegisterPage() {
                   </Button>
                 </div>
               </div>
-
               {error && <p className="text-sm text-red-500 text-center">{error}</p>}
               {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200 text-center">{success}</p>}
-
               <Button type="submit" className="w-full" variant="chiti_bank" disabled={loading}>
                 {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
               </Button>
             </form>
-
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 ¿Ya tienes cuenta?{' '}
@@ -198,7 +189,6 @@ export default function RegisterPage() {
             </div>
           </CardContent>
         </Card>
-
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-gray-500 hover:text-chiti_bank-blue transition-colors">
             ← Volver al inicio
