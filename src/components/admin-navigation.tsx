@@ -37,7 +37,7 @@ export function AdminNavigation() {
     ];
 
     return (
-        <aside className="w-64" aria-label="Sidebar">
+        <aside className="w-64 flex-shrink-0" aria-label="Sidebar">
             <div className="px-3 py-4 overflow-y-auto rounded bg-gray-800 h-full flex flex-col min-h-screen">
                 <Link
                     href="/admin"
