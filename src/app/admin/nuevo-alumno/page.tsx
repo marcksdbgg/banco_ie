@@ -111,9 +111,10 @@ export default function NuevoAlumnoPage() {
         router.push('/admin/lista-alumnos');
       }, 2000);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding student:', error);
-      setErrors({ general: `Error al registrar el alumno: ${error.message}` });
+      const err = error as Error;
+      setErrors({ general: `Error al registrar el alumno: ${err.message}` });
     } finally {
       setIsSubmitting(false);
     }

@@ -1,143 +1,86 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { useBancochiti_bank } from '@/contexts/banco-chiti_bank-context';
-import { 
-  LayoutDashboard, 
-  UserPlus, 
-  Users, 
-  LogOut,
-  Menu,
-  X
-} from 'lucide-react';
-import { useState } from 'react';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Home, Users, LogOut, Landmark } from "lucide-react";
+import { Button } from "./ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 
-export default function AdminNavigation() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { logout } = useBancochiti_bank();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export function AdminNavigation() {
+    const pathname = usePathname();
+    const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-  };
+    const handleLogout = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push('/auth/login');
+    };
 
-  const navItems = [
-    {
-      href: '/admin',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-      active: pathname === '/admin'
-    },
-    {
-      href: '/admin/nuevo-alumno',
-      label: 'Nuevo Alumno',
-      icon: UserPlus,
-      active: pathname === '/admin/nuevo-alumno'
-    },
-    {
-      href: '/admin/lista-alumnos',
-      label: 'Lista de Alumnos',
-      icon: Users,
-      active: pathname === '/admin/lista-alumnos'
-    }
-  ];
+    const links = [
+        {
+            href: "/admin",
+            label: "Dashboard",
+            icon: Home,
+        },
+        {
+            href: "/admin/lista-alumnos",
+            label: "Alumnos",
+            icon: Users,
+        },
+        {
+            href: "/admin/configuracion",
+            label: "Configuración",
+            icon: Landmark,
+        },
+    ];
 
-  return (
-    <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/admin" className="flex items-center space-x-3">
-            <img src="/chitibank-logo.jpeg" alt="ChitiBank Logo" className="h-10 w-auto" />
-            <div>
-              <h1 className="text-xl font-bold text-chiti_bank-blue">ChitiBank</h1>
-              <p className="text-xs text-gray-600">Panel Administrativo</p>
-            </div>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
+    return (
+        <aside className="w-64" aria-label="Sidebar">
+            <div className="px-3 py-4 overflow-y-auto rounded bg-gray-800 h-full flex flex-col">
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    item.active
-                      ? 'bg-chiti_bank-blue text-white'
-                      : 'text-gray-600 hover:text-chiti_bank-blue hover:bg-blue-50'
-                  }`}
+                    href="/admin"
+                    className="flex items-center pl-2.5 mb-5"
                 >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
+                    <Image
+                        src="/chitibank-logo.jpeg"
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 mr-3 rounded-md"
+                        alt="ChitiBank Logo"
+                    />
+                    <span className="self-center text-xl font-semibold whitespace-nowrap text-white">
+                        ChitiBank
+                    </span>
                 </Link>
-              );
-            })}
-          </div>
-
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center space-x-3">
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Cerrar Sesión
-            </Button>
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t bg-white">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      item.active
-                        ? 'bg-chiti_bank-blue text-white'
-                        : 'text-gray-600 hover:text-chiti_bank-blue hover:bg-blue-50'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-              <Button 
-                variant="outline" 
-                onClick={handleLogout}
-                className="w-full justify-start mt-3"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Cerrar Sesión
-              </Button>
+                <nav className="space-y-2 flex-grow">
+                    {links.map((link) => (
+                        <Link
+                            key={link.href}
+                            href={link.href}
+                            className={`flex items-center p-2 text-sm font-medium rounded-lg transition-colors group ${
+                                pathname.startsWith(link.href) && (link.href !== "/admin" || pathname === "/admin")
+                                    ? "bg-gray-700 text-white"
+                                    : "text-gray-300 hover:bg-gray-700"
+                            }`}
+                        >
+                            <link.icon className="w-5 h-5 mr-3" />
+                            {link.label}
+                        </Link>
+                    ))}
+                </nav>
+                <div className="pt-4 mt-4 border-t border-gray-700">
+                    <Button
+                        onClick={handleLogout}
+                        variant="ghost"
+                        className="w-full justify-start text-left text-gray-300 hover:bg-red-600 hover:text-white"
+                    >
+                        <LogOut className="h-5 w-5 mr-3" />
+                        Cerrar Sesión
+                    </Button>
+                </div>
             </div>
-          </div>
-        )}
-      </div>
-    </nav>
-  );
+        </aside>
+    );
 }

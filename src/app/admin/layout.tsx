@@ -1,5 +1,5 @@
 import AdminGuard from '@/components/admin-guard';
-import AdminNavigation from '@/components/admin-navigation';
+import { AdminNavigation } from '@/components/admin-navigation';
 
 export default function AdminLayout({
   children,

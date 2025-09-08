@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatSoles } from '@/lib/utils';
@@ -22,7 +22,7 @@ import {
   PlusCircle,
   MinusCircle
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation';
 
 type Alumno = {
     id: string;
@@ -47,7 +47,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     const [transactionForm, setTransactionForm] = useState({ tipo: 'deposito' as 'deposito' | 'retiro', monto: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const supabase = createClient();
-    const router = useRouter();
+    // const router = useRouter();
 
     const filteredAlumnos = alumnos.filter(alumno =>
         alumno.nombre.toLowerCase().includes(searchTerm.toLowerCase())

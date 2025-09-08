@@ -35,13 +35,17 @@ export default function TransferPage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Usuario no autenticado.');
 
+            // La cuenta de origen se debe obtener por el `usuario_id` que corresponde al `user.id` del usuario autenticado.
             const { data: cuentaOrigen, error: cuentaOrigenError } = await supabase
                 .from('cuentas')
                 .select('id')
-                .eq('id_usuario', user.id)
+                .eq('usuario_id', user.id)
                 .single();
 
-            if (cuentaOrigenError || !cuentaOrigen) throw new Error('No se pudo encontrar la cuenta de origen.');
+            if (cuentaOrigenError || !cuentaOrigen) {
+                console.error('Error fetching origin account:', cuentaOrigenError);
+                throw new Error('No se pudo encontrar tu cuenta de origen. Asegúrate de tener una cuenta asignada.');
+            }
 
             const { data, error: functionError } = await supabase.functions.invoke('realizar-transaccion', {
                 body: {
@@ -70,8 +74,9 @@ export default function TransferPage() {
                 router.push('/dashboard');
             }, 2000);
 
-        } catch (err: any) {
-            setError(err.message || 'Ocurrió un error inesperado.');
+        } catch (err) {
+            const error = err as Error;
+            setError(error.message || 'Ocurrió un error inesperado.');
         } finally {
             setLoading(false);
         }
