@@ -1,10 +1,8 @@
-'use client';
-
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useBancochiti_bank } from '@/contexts/banco-chiti_bank-context';
-import { formatSoles } from '@/lib/csv-storage';
+import { createClient } from '@/lib/supabase/server';
+import { formatSoles } from '@/lib/utils';
 import { 
   Users, 
   UserPlus, 
@@ -12,28 +10,80 @@ import {
   TrendingUp,
   ArrowRight,
   DollarSign,
-  Download,
-  Upload
 } from 'lucide-react';
+import { redirect } from 'next/navigation';
 
-export default function AdminDashboard() {
-  const { students, exportToCSV, importFromCSV } = useBancochiti_bank();
+async function getStats(supabase: any) {
+    const { data: profiles, error: profilesError } = await supabase
+        .from('perfiles')
+        .select('id', { count: 'exact' })
+        .eq('rol', 'cliente');
 
-  // Calcular estadísticas
-  const totalStudents = students.length;
-  const totalBalance = students.reduce((sum, student) => sum + student.saldo, 0);
-  const averageBalance = totalStudents > 0 ? totalBalance / totalStudents : 0;
-  const recentStudents = students.slice(-3).reverse(); // Los 3 más recientes
-
-  const handleImportCSV = async () => {
-    try {
-      await importFromCSV();
-      // Mostrar mensaje de éxito si es necesario
-    } catch (error) {
-      console.error('Error importing CSV:', error);
-      // Mostrar mensaje de error si es necesario
+    if (profilesError) {
+        console.error('Error fetching profiles count:', profilesError);
+        return { totalStudents: 0, totalBalance: 0 };
     }
-  };
+
+    const { data: totalBalanceData, error: balanceError } = await supabase
+        .from('cuentas')
+        .select('saldo');
+
+    if (balanceError) {
+        console.error('Error fetching total balance:', balanceError);
+        return { totalStudents: profiles.length, totalBalance: 0 };
+    }
+
+    const totalBalance = totalBalanceData.reduce((sum: number, account: { saldo: number }) => sum + account.saldo, 0);
+    
+    return {
+        totalStudents: profiles.length,
+        totalBalance,
+    };
+}
+
+async function getRecentStudents(supabase: any) {
+    const { data, error } = await supabase
+        .from('perfiles')
+        .select(`
+            id,
+            nombre_completo,
+            fecha_creacion,
+            cuentas (
+                saldo
+            )
+        `)
+        .eq('rol', 'cliente')
+        .order('fecha_creacion', { ascending: false })
+        .limit(3);
+
+    if (error) {
+        console.error('Error fetching recent students:', error);
+        return [];
+    }
+
+    return data.map((profile: any) => ({
+        id: profile.id,
+        nombre: profile.nombre_completo,
+        fechaCreacion: profile.fecha_creacion,
+        saldo: profile.cuentas[0]?.saldo ?? 0,
+    }));
+}
+
+
+export default async function AdminDashboard() {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return redirect('/auth/login');
+  }
+
+  const { totalStudents, totalBalance } = await getStats(supabase);
+  const averageBalance = totalStudents > 0 ? totalBalance / totalStudents : 0;
+  const recentStudents = await getRecentStudents(supabase);
 
   const statsCards = [
     {
@@ -41,7 +91,7 @@ export default function AdminDashboard() {
       value: totalStudents.toString(),
       description: 'Estudiantes registrados',
       icon: Users,
-      color: 'text-chiti_bank-blue',
+      color: 'text-munay-blue',
       bgColor: 'bg-blue-50'
     },
     {
@@ -49,7 +99,7 @@ export default function AdminDashboard() {
       value: formatSoles(totalBalance),
       description: 'Dinero total en el banco',
       icon: DollarSign,
-      color: 'text-chiti_bank-green',
+      color: 'text-munay-green',
       bgColor: 'bg-green-50'
     },
     {
@@ -103,14 +153,14 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-2 hover:border-chiti_bank-blue transition-colors">
+        <Card className="border-2 hover:border-munay-blue transition-colors">
           <CardHeader>
             <div className="flex items-center space-x-3">
-              <div className="bg-chiti_bank-blue text-white p-2 rounded-lg">
+              <div className="bg-munay-blue text-white p-2 rounded-lg">
                 <UserPlus className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle className="text-chiti_bank-blue">Registrar Nuevo Alumno</CardTitle>
+                <CardTitle className="text-munay-blue">Registrar Nuevo Alumno</CardTitle>
                 <CardDescription>
                   Añade un nuevo estudiante al sistema bancario
                 </CardDescription>
@@ -127,14 +177,14 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 hover:border-chiti_bank-green transition-colors">
+        <Card className="border-2 hover:border-munay-green transition-colors">
           <CardHeader>
             <div className="flex items-center space-x-3">
-              <div className="bg-chiti_bank-green text-white p-2 rounded-lg">
+              <div className="bg-munay-green text-white p-2 rounded-lg">
                 <Users className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle className="text-chiti_bank-green">Ver Lista de Alumnos</CardTitle>
+                <CardTitle className="text-munay-green">Ver Lista de Alumnos</CardTitle>
                 <CardDescription>
                   Consulta y gestiona las cuentas existentes
                 </CardDescription>
@@ -152,44 +202,11 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* CSV Operations */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Banknote className="h-5 w-5 text-chiti_bank-blue" />
-            <span>Gestión de Datos</span>
-          </CardTitle>
-          <CardDescription>
-            Exporta e importa datos de estudiantes en formato CSV
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button variant="outline" onClick={exportToCSV} className="flex-1">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar a CSV
-            </Button>
-            <Button variant="outline" onClick={handleImportCSV} className="flex-1">
-              <Upload className="h-4 w-4 mr-2" />
-              Importar desde CSV
-            </Button>
-          </div>
-          <div className="mt-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800 font-medium mb-2">💡 Información CSV:</p>
-            <ul className="text-xs text-blue-700 space-y-1">
-              <li>• El archivo CSV se guarda con formato: id,nombre,saldo,fechaCreacion</li>
-              <li>• Puedes editar el archivo en Excel y volver a importarlo</li>
-              <li>• Los datos se mantienen sincronizados automáticamente</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Recent Students */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Banknote className="h-5 w-5 text-chiti_bank-blue" />
+            <Banknote className="h-5 w-5 text-munay-blue" />
             <span>Estudiantes Recientes</span>
           </CardTitle>
           <CardDescription>
@@ -199,13 +216,13 @@ export default function AdminDashboard() {
         <CardContent>
           {recentStudents.length > 0 ? (
             <div className="space-y-3">
-              {recentStudents.map((student) => (
+              {recentStudents.map((student: any) => (
                 <div 
                   key={student.id} 
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="bg-chiti_bank-blue text-white p-2 rounded-full">
+                    <div className="bg-munay-blue text-white p-2 rounded-full">
                       <Users className="h-4 w-4" />
                     </div>
                     <div>
@@ -216,10 +233,10 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-chiti_bank-green">
+                    <p className="font-bold text-munay-green">
                       {formatSoles(student.saldo)}
                     </p>
-                    <p className="text-xs text-gray-600">Saldo inicial</p>
+                    <p className="text-xs text-gray-600">Saldo actual</p>
                   </div>
                 </div>
               ))}
