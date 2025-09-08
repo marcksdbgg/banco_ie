@@ -5,6 +5,18 @@ import AlumnosClient from './page-client';
 
 async function getAlumnos() {
     const supabase = createClient();
+
+    // Define a type for the data returned from Supabase
+    type PerfilConCuenta = {
+        id: string;
+        nombre_completo: string;
+        fecha_creacion: string;
+        cuentas: {
+            id: string;
+            saldo: number;
+        }[];
+    };
+
     const { data, error } = await supabase
         .from('perfiles')
         .select(`
@@ -24,13 +36,14 @@ async function getAlumnos() {
         return [];
     }
 
-    return data.map(perfil => ({
+    // Cast the data to our defined type
+    const typedData = data as PerfilConCuenta[];
+
+    return typedData.map(perfil => ({
         id: perfil.id,
         nombre: perfil.nombre_completo,
         fechaCreacion: perfil.fecha_creacion,
-        // @ts-ignore
         cuentaId: perfil.cuentas[0]?.id ?? null,
-        // @ts-ignore
         saldo: perfil.cuentas[0]?.saldo ?? 0,
     }));
 }
