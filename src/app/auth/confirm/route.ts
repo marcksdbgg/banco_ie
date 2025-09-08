@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (token_hash && type) {
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient()
 
     const { error } = await supabase.auth.verifyOtp({

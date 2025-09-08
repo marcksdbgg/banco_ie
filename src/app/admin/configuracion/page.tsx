@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Settings } from "lucide-react";
 
 export default async function ConfiguracionPage() {
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient();
 
     const {

@@ -42,12 +42,10 @@ BEGIN
     UPDATE public.cuentas SET saldo_actual = saldo_actual - monto_param WHERE id = cuenta_origen_id_param;
     UPDATE public.cuentas SET saldo_actual = saldo_actual + monto_param WHERE id = cuenta_destino_id_var;
     
-    -- Registrar ambas transacciones para el historial de cada usuario
+    -- CORRECCIÓN: Se registra una única transacción con el tipo 'transferencia' para cumplir la regla de la tabla.
+    -- La descripción ahora es más clara y se evita duplicar registros.
     INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
-    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_enviada', 'Envío a ' || nombre_destino_var);
-
-    INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
-    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_recibida', 'Recibido de ' || (SELECT p.nombre_completo FROM cuentas c JOIN perfiles p ON c.usuario_id = p.id WHERE c.id = cuenta_origen_id_param));
+    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia', 'Transferencia de ' || nombre_origen_var || ' a ' || nombre_destino_var);
 
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
