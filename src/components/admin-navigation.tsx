@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, LogOut, Landmark } from "lucide-react";
+import { Home, Users, LogOut, Settings } from "lucide-react"; // Cambiado Landmark por Settings
 import { Button } from "./ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -32,13 +32,13 @@ export function AdminNavigation() {
         {
             href: "/admin/configuracion",
             label: "Configuración",
-            icon: Landmark,
+            icon: Settings,
         },
     ];
 
     return (
         <aside className="w-64" aria-label="Sidebar">
-            <div className="px-3 py-4 overflow-y-auto rounded bg-gray-800 h-full flex flex-col">
+            <div className="px-3 py-4 overflow-y-auto rounded bg-gray-800 h-full flex flex-col min-h-screen">
                 <Link
                     href="/admin"
                     className="flex items-center pl-2.5 mb-5"
@@ -57,7 +57,7 @@ export function AdminNavigation() {
                 <nav className="space-y-2 flex-grow">
                     {links.map((link) => (
                         <Link
-                            key={link.href}
+                            key={link.href} // CORRECCIÓN: Añadida la prop key
                             href={link.href}
                             className={`flex items-center p-2 text-sm font-medium rounded-lg transition-colors group ${
                                 pathname.startsWith(link.href) && (link.href !== "/admin" || pathname === "/admin")

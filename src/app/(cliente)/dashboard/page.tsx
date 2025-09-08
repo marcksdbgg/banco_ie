@@ -7,12 +7,13 @@ import Link from 'next/link';
 import { ArrowRight, Banknote, Clock, DollarSign, Send } from 'lucide-react';
 
 async function getDashboardData(userId: string) {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
 
     const { data: cuenta, error: cuentaError } = await supabase
         .from('cuentas')
         .select('*')
-        .eq('id_usuario', userId)
+        .eq('usuario_id', userId)
         .single();
 
     if (cuentaError || !cuenta) {
@@ -38,7 +39,8 @@ async function getDashboardData(userId: string) {
 }
 
 export default async function DashboardPage() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -49,7 +51,7 @@ export default async function DashboardPage() {
 
     if (!cuenta) {
         return (
-            <div className="text-center">
+            <div className="text-center p-4">
                 <h2 className="text-xl font-semibold">No se encontró una cuenta asociada.</h2>
                 <p>Por favor, contacte a un administrador.</p>
             </div>
@@ -75,7 +77,7 @@ export default async function DashboardPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-4xl font-bold">{formatSoles(cuenta.saldo)}</p>
+                    <p className="text-4xl font-bold">{formatSoles(cuenta.saldo_actual)}</p>
                     <p className="text-sm opacity-80">Número de cuenta: {cuenta.numero_cuenta}</p>
                 </CardContent>
             </Card>
@@ -106,7 +108,7 @@ export default async function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-gray-600 mb-4">Consulta el historial completo de tus transacciones.</p>
-                        <Button variant="outline" className="w-full">
+                        <Button variant="outline" className="w-full" disabled>
                             Ver Historial Completo <ArrowRight className="h-4 w-4 ml-2" />
                         </Button>
                     </CardContent>
@@ -128,8 +130,8 @@ export default async function DashboardPage() {
                                     <p className="font-semibold capitalize">{t.tipo}</p>
                                     <p className="text-sm text-gray-500">{new Date(t.fecha).toLocaleString('es-PE')}</p>
                                 </div>
-                                <p className={`font-bold ${t.monto > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {formatSoles(t.monto)}
+                                <p className={`font-bold ${t.cuenta_destino_id === cuenta.id ? 'text-green-600' : 'text-red-600'}`}>
+                                    {t.cuenta_destino_id === cuenta.id ? '+' : '-'} {formatSoles(t.monto)}
                                 </p>
                             </div>
                         )) : (

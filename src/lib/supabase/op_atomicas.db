@@ -1,0 +1,53 @@
+-- Función para realizar transferencias de manera segura y atómica
+CREATE OR REPLACE FUNCTION public.realizar_transferencia(
+    cuenta_origen_id_param UUID,
+    numero_cuenta_destino_param TEXT,
+    monto_param NUMERIC
+)
+RETURNS VOID AS $$
+DECLARE
+    cuenta_destino_id_var UUID;
+    saldo_origen_actual NUMERIC;
+    nombre_origen_var TEXT;
+    nombre_destino_var TEXT;
+BEGIN
+    -- Validar que quien ejecuta es el dueño de la cuenta de origen
+    IF NOT EXISTS (SELECT 1 FROM public.cuentas WHERE id = cuenta_origen_id_param AND usuario_id = auth.uid()) THEN
+        RAISE EXCEPTION 'Permiso denegado: No eres el dueño de la cuenta de origen.';
+    END IF;
+
+    -- Obtener datos de la cuenta destino y bloquear la fila para evitar concurrencia
+    SELECT c.id, p.nombre_completo INTO cuenta_destino_id_var, nombre_destino_var
+    FROM public.cuentas c JOIN public.perfiles p ON c.usuario_id = p.id
+    WHERE c.numero_cuenta = numero_cuenta_destino_param FOR UPDATE;
+    
+    IF cuenta_destino_id_var IS NULL THEN
+        RAISE EXCEPTION 'La cuenta de destino no existe.';
+    END IF;
+
+    IF cuenta_destino_id_var = cuenta_origen_id_param THEN
+        RAISE EXCEPTION 'No se puede transferir a la misma cuenta.';
+    END IF;
+
+    -- Obtener saldo de origen y bloquear la fila
+    SELECT c.saldo_actual, p.nombre_completo INTO saldo_origen_actual, nombre_origen_var
+    FROM public.cuentas c JOIN public.perfiles p ON c.usuario_id = p.id
+    WHERE c.id = cuenta_origen_id_param FOR UPDATE;
+    
+    IF saldo_origen_actual < monto_param THEN
+        RAISE EXCEPTION 'Saldo insuficiente.';
+    END IF;
+    
+    -- Realizar las operaciones de actualización de saldos
+    UPDATE public.cuentas SET saldo_actual = saldo_actual - monto_param WHERE id = cuenta_origen_id_param;
+    UPDATE public.cuentas SET saldo_actual = saldo_actual + monto_param WHERE id = cuenta_destino_id_var;
+    
+    -- Registrar ambas transacciones para el historial de cada usuario
+    INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
+    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_enviada', 'Envío a ' || nombre_destino_var);
+
+    INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
+    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_recibida', 'Recibido de ' || (SELECT p.nombre_completo FROM cuentas c JOIN perfiles p ON c.usuario_id = p.id WHERE c.id = cuenta_origen_id_param));
+
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

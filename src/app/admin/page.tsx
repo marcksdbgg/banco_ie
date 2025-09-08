@@ -5,9 +5,17 @@ import { createClient } from '@/lib/supabase/server';
 import { formatSoles } from '@/lib/utils';
 import { Users, UserPlus, Banknote, TrendingUp, ArrowRight, DollarSign } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import { Database } from '@/lib/supabase/database.types';
+
+type Profile = Database['public']['Tables']['perfiles']['Row'];
+type Account = Database['public']['Tables']['cuentas']['Row'];
+type ProfileWithAccount = Profile & {
+    cuentas: Pick<Account, 'saldo_actual'>[];
+};
 
 async function getStats() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { count, error: countError } = await supabase
       .from('perfiles')
       .select('*', { count: 'exact', head: true })
@@ -18,7 +26,7 @@ async function getStats() {
     const { data: accounts, error: balanceError } = await supabase.from('cuentas').select('saldo_actual');
     if (balanceError) console.error("Error fetching balances:", balanceError);
     
-    const totalBalance = accounts?.reduce((acc, curr) => acc + curr.saldo_actual, 0) ?? 0;
+    const totalBalance = accounts?.reduce((acc, curr) => acc + (curr.saldo_actual ?? 0), 0) ?? 0;
     
     return {
         totalStudents: count ?? 0,
@@ -27,7 +35,8 @@ async function getStats() {
 }
 
 async function getRecentStudents() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
         .select(`id, nombre_completo, fecha_creacion, cuentas(saldo_actual)`)
@@ -39,17 +48,20 @@ async function getRecentStudents() {
         console.error("Error fetching recent students:", error);
         return [];
     }
+    
+    const typedData = data as ProfileWithAccount[];
 
-    return data.map(profile => ({
+    return typedData.map(profile => ({
         id: profile.id,
         nombre: profile.nombre_completo,
         fechaCreacion: profile.fecha_creacion,
-        saldo: (profile.cuentas as any)[0]?.saldo_actual ?? 0,
+        saldo: profile.cuentas[0]?.saldo_actual ?? 0,
     }));
 }
 
 export default async function AdminDashboard() {
-  const supabase = createClient();
+  // CORRECCIÓN: Se debe usar await para el cliente de servidor
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 

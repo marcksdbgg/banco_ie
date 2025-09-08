@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import AlumnosClient from './page-client';
 
-// Tipamos la data que esperamos
 type AlumnoConCuenta = {
     id: string;
     nombre_completo: string;
@@ -14,7 +13,8 @@ type AlumnoConCuenta = {
 };
 
 async function getAlumnos() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
         .select(`id, nombre_completo, fecha_creacion, cuentas(id, saldo_actual)`)
@@ -32,13 +32,14 @@ async function getAlumnos() {
         id: perfil.id,
         nombre: perfil.nombre_completo,
         fechaCreacion: perfil.fecha_creacion,
-        cuentaId: perfil.cuentas[0]?.id ?? '', // Asumimos una cuenta por perfil
+        cuentaId: perfil.cuentas[0]?.id ?? '',
         saldo: perfil.cuentas[0]?.saldo_actual ?? 0,
     }));
 }
 
 export default async function ListaAlumnosPage() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect('/auth/login');
 

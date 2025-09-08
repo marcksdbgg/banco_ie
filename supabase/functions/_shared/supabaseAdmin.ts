@@ -1,1 +1,0 @@
-# Supabase client with SERVICE_ROLE key

@@ -27,10 +27,11 @@ banco_ie/
 │   │   │   │       └── page.tsx
 │   │   │   └── layout.tsx
 │   │   ├── admin
+│   │   │   ├── configuracion
+│   │   │   │   └── page.tsx
 │   │   │   ├── layout.tsx
 │   │   │   ├── lista-alumnos
 │   │   │   │   ├── page-client.tsx
-│   │   │   │   ├── page-new.tsx
 │   │   │   │   └── page.tsx
 │   │   │   ├── nuevo-alumno
 │   │   │   │   └── page.tsx
@@ -65,29 +66,33 @@ banco_ie/
 │   │       ├── input.tsx
 │   │       ├── label.tsx
 │   │       └── table.tsx
-│   ├── contexts
 │   ├── lib
 │   │   ├── supabase
 │   │   │   ├── client.ts
+│   │   │   ├── database.types.ts
 │   │   │   ├── middleware.ts
+│   │   │   ├── op_atomicas.db
 │   │   │   └── server.ts
 │   │   └── utils.ts
 │   └── middleware.ts
 ├── supabase
 │   ├── .gitignore
 │   ├── .temp
-│   │   └── cli-latest
+│   │   ├── cli-latest
+│   │   ├── gotrue-version
+│   │   ├── pooler-url
+│   │   ├── postgres-version
+│   │   ├── project-ref
+│   │   ├── rest-version
+│   │   └── storage-version
 │   ├── config.toml
 │   └── functions
 │       ├── _shared
-│       │   ├── cors.ts
-│       │   ├── supabaseAdmin.ts
-│       │   └── supabaseClient.ts
+│       │   └── cors.ts
 │       ├── crear-usuario-cliente
 │       │   └── index.ts
 │       ├── gestionar-fondos
 │       │   └── index.ts
-│       ├── import_map.jso
 │       └── iniciar-transferencia-cliente
 │           └── index.ts
 ├── tailwind.config.ts
@@ -160,8 +165,8 @@ banco_ie/
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "supabase/functions/**"]
 }
 
 ```
@@ -233,6 +238,7 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  { ignores: ["src/lib/supabase/database.types.ts"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 
@@ -620,12 +626,13 @@ import Link from 'next/link';
 import { ArrowRight, Banknote, Clock, DollarSign, Send } from 'lucide-react';
 
 async function getDashboardData(userId: string) {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
 
     const { data: cuenta, error: cuentaError } = await supabase
         .from('cuentas')
         .select('*')
-        .eq('id_usuario', userId)
+        .eq('usuario_id', userId)
         .single();
 
     if (cuentaError || !cuenta) {
@@ -651,7 +658,8 @@ async function getDashboardData(userId: string) {
 }
 
 export default async function DashboardPage() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -662,7 +670,7 @@ export default async function DashboardPage() {
 
     if (!cuenta) {
         return (
-            <div className="text-center">
+            <div className="text-center p-4">
                 <h2 className="text-xl font-semibold">No se encontró una cuenta asociada.</h2>
                 <p>Por favor, contacte a un administrador.</p>
             </div>
@@ -688,7 +696,7 @@ export default async function DashboardPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-4xl font-bold">{formatSoles(cuenta.saldo)}</p>
+                    <p className="text-4xl font-bold">{formatSoles(cuenta.saldo_actual)}</p>
                     <p className="text-sm opacity-80">Número de cuenta: {cuenta.numero_cuenta}</p>
                 </CardContent>
             </Card>
@@ -719,7 +727,7 @@ export default async function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-gray-600 mb-4">Consulta el historial completo de tus transacciones.</p>
-                        <Button variant="outline" className="w-full">
+                        <Button variant="outline" className="w-full" disabled>
                             Ver Historial Completo <ArrowRight className="h-4 w-4 ml-2" />
                         </Button>
                     </CardContent>
@@ -741,8 +749,8 @@ export default async function DashboardPage() {
                                     <p className="font-semibold capitalize">{t.tipo}</p>
                                     <p className="text-sm text-gray-500">{new Date(t.fecha).toLocaleString('es-PE')}</p>
                                 </div>
-                                <p className={`font-bold ${t.monto > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {formatSoles(t.monto)}
+                                <p className={`font-bold ${t.cuenta_destino_id === cuenta.id ? 'text-green-600' : 'text-red-600'}`}>
+                                    {t.cuenta_destino_id === cuenta.id ? '+' : '-'} {formatSoles(t.monto)}
                                 </p>
                             </div>
                         )) : (
@@ -754,15 +762,15 @@ export default async function DashboardPage() {
         </div>
     );
 }
-
 ```
 
 ## File: `src\app\(cliente)\dashboard\transferir\page.tsx`
 ```tsx
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -773,7 +781,6 @@ import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function TransferPage() {
     const router = useRouter();
-    const supabase = createClient();
     const [numeroCuentaDestino, setNumeroCuentaDestino] = useState('');
     const [monto, setMonto] = useState('');
     const [loading, setLoading] = useState(false);
@@ -793,37 +800,21 @@ export default function TransferPage() {
         setLoading(true);
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('Usuario no autenticado.');
-
-            // La cuenta de origen se debe obtener por el `usuario_id` que corresponde al `user.id` del usuario autenticado.
-            const { data: cuentaOrigen, error: cuentaOrigenError } = await supabase
-                .from('cuentas')
-                .select('id')
-                .eq('usuario_id', user.id)
-                .single();
-
-            if (cuentaOrigenError || !cuentaOrigen) {
-                console.error('Error fetching origin account:', cuentaOrigenError);
-                throw new Error('No se pudo encontrar tu cuenta de origen. Asegúrate de tener una cuenta asignada.');
-            }
-
-            const { data, error: functionError } = await supabase.functions.invoke('realizar-transaccion', {
+            const supabase = createClient();
+            
+            const { data, error: functionError } = await supabase.functions.invoke('iniciar-transferencia-cliente', {
                 body: {
-                    tipo: 'transferencia',
+                    numero_cuenta_destino: numeroCuentaDestino,
                     monto: parseFloat(monto),
-                    cuentaOrigenId: cuentaOrigen.id,
-                    numeroCuentaDestino: numeroCuentaDestino,
                 },
             });
 
             if (functionError) {
-                // The error from the Edge Function is often in the 'message' property of the response
                 const errorMessage = functionError.context?.msg ?? functionError.message;
                 throw new Error(errorMessage);
             }
-
-            if (data.error) {
+            
+            if (data?.error) {
                 throw new Error(data.error);
             }
 
@@ -833,6 +824,7 @@ export default function TransferPage() {
 
             setTimeout(() => {
                 router.push('/dashboard');
+                router.refresh();
             }, 2000);
 
         } catch (err) {
@@ -911,7 +903,6 @@ export default function TransferPage() {
         </div>
     );
 }
-
 ```
 
 ## File: `src\app\(cliente)\layout.tsx`
@@ -926,6 +917,34 @@ export default function ClienteLayout({
     return <ClientGuard>{children}</ClientGuard>;
 }
 
+```
+
+## File: `src\app\admin\configuracion\page.tsx`
+```tsx
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Settings } from "lucide-react";
+
+export default function ConfiguracionPage() {
+    return (
+        <div className="space-y-6">
+            <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center">
+                        <Settings className="mr-2 h-5 w-5" />
+                        Panel de Configuración
+                    </CardTitle>
+                    <CardDescription>
+                        Esta sección está en construcción. Aquí podrás gestionar la configuración general del banco escolar.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-gray-600">Próximamente...</p>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
 ```
 
 ## File: `src\app\admin\layout.tsx`
@@ -957,7 +976,7 @@ export default function AdminLayout({
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -966,19 +985,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatSoles } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { 
-  Users, 
-  UserPlus, 
-  Search, 
-  ArrowLeft,
-  DollarSign,
-  Edit,
-  Trash2,
-  AlertTriangle,
-  PlusCircle,
-  MinusCircle
-} from 'lucide-react';
-// import { useRouter } from 'next/navigation';
+import { Search, DollarSign, Edit, Trash2, AlertTriangle, PlusCircle, MinusCircle, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type Alumno = {
     id: string;
@@ -993,386 +1001,148 @@ type AlumnosClientProps = {
 };
 
 export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
-    const [alumnos, setAlumnos] = useState(initialAlumnos);
+    const [alumnos] = useState(initialAlumnos);
     const [searchTerm, setSearchTerm] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [isTransaction, setIsTransaction] = useState(false);
     const [selectedAlumno, setSelectedAlumno] = useState<Alumno | null>(null);
+    const [modal, setModal] = useState<'edit' | 'delete' | 'transaction' | null>(null);
     const [editForm, setEditForm] = useState({ nombre: '' });
     const [transactionForm, setTransactionForm] = useState({ tipo: 'deposito' as 'deposito' | 'retiro', monto: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState('');
     const supabase = createClient();
-    // const router = useRouter();
+    const router = useRouter();
 
     const filteredAlumnos = alumnos.filter(alumno =>
         alumno.nombre.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const totalStudents = alumnos.length;
-    const totalBalance = alumnos.reduce((sum, alumno) => sum + alumno.saldo, 0);
-    const averageBalance = totalStudents > 0 ? totalBalance / totalStudents : 0;
-
-    const handleEdit = (alumno: Alumno) => {
+    const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
         setSelectedAlumno(alumno);
-        setEditForm({ nombre: alumno.nombre });
-        setIsEditing(true);
+        if (type === 'edit') setEditForm({ nombre: alumno.nombre });
+        if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
+        setError('');
+        setModal(type);
     };
 
     const handleUpdate = async () => {
         if (!selectedAlumno || !editForm.nombre.trim()) return;
         setIsSubmitting(true);
-        const { error } = await supabase
-            .from('perfiles')
-            .update({ nombre_completo: editForm.nombre.trim() })
-            .eq('id', selectedAlumno.id);
-        
+        const { error } = await supabase.from('perfiles').update({ nombre_completo: editForm.nombre.trim() }).eq('id', selectedAlumno.id);
         if (!error) {
-            setAlumnos(alumnos.map(a => a.id === selectedAlumno.id ? { ...a, nombre: editForm.nombre.trim() } : a));
-            setIsEditing(false);
-            setSelectedAlumno(null);
+            router.refresh();
+            setModal(null);
         } else {
-            console.error("Error updating name:", error);
+            setError(error.message);
         }
         setIsSubmitting(false);
-    };
-
-    const handleDelete = (alumno: Alumno) => {
-        setSelectedAlumno(alumno);
-        setIsDeleting(true);
     };
 
     const confirmDelete = async () => {
         if (!selectedAlumno) return;
         setIsSubmitting(true);
-        const { error } = await supabase.auth.admin.deleteUser(selectedAlumno.id);
-
+        // Debe ser una Edge Function por seguridad
+        const { error } = await supabase.functions.invoke('borrar-usuario-cliente', { body: { userId: selectedAlumno.id } });
         if (!error) {
-            setAlumnos(alumnos.filter(a => a.id !== selectedAlumno.id));
-            setIsDeleting(false);
-            setSelectedAlumno(null);
+            router.refresh();
+            setModal(null);
         } else {
-            console.error("Error deleting user:", error);
+            setError(error.message);
         }
         setIsSubmitting(false);
     };
 
-    const handleTransaction = (alumno: Alumno) => {
-        setSelectedAlumno(alumno);
-        setTransactionForm({ tipo: 'deposito', monto: '' });
-        setIsTransaction(true);
-    };
-
     const confirmTransaction = async () => {
         if (!selectedAlumno || !transactionForm.monto) return;
-        
         const monto = parseFloat(transactionForm.monto);
         if (isNaN(monto) || monto <= 0) {
-            alert("Por favor, ingrese un monto válido.");
-            return;
+            setError("Monto inválido."); return;
         }
-
-        if (transactionForm.tipo === 'retiro' && monto > selectedAlumno.saldo) {
-            alert("Fondos insuficientes para el retiro.");
-            return;
-        }
-
         setIsSubmitting(true);
-
-        const { error } = await supabase.functions.invoke('realizar-transaccion', {
-            body: {
-                tipo_operacion: transactionForm.tipo,
-                cuenta_origen_id: selectedAlumno.cuentaId,
-                monto: monto,
-            },
+        const { error } = await supabase.functions.invoke('gestionar-fondos', {
+            body: { tipo: transactionForm.tipo, cuenta_id: selectedAlumno.cuentaId, monto },
         });
-
         if (!error) {
-            // Actualizar el saldo localmente para reflejar el cambio instantáneamente
-            setAlumnos(alumnos.map(a => {
-                if (a.id === selectedAlumno.id) {
-                    const nuevoSaldo = transactionForm.tipo === 'deposito' ? a.saldo + monto : a.saldo - monto;
-                    return { ...a, saldo: nuevoSaldo };
-                }
-                return a;
-            }));
-            setIsTransaction(false);
-            setSelectedAlumno(null);
+            router.refresh();
+            setModal(null);
         } else {
-            console.error("Error en la transacción:", error);
-            alert(`Error en la transacción: ${error.message}`);
+            setError(error.message);
         }
         setIsSubmitting(false);
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <Link href="/admin">
-                            <Button variant="outline" size="sm">
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Volver al Panel
-                            </Button>
-                        </Link>
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Lista de Alumnos</h1>
-                            <p className="text-gray-600">Gestiona la información de todos los estudiantes</p>
-                        </div>
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Búsqueda de Alumnos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Buscar por nombre..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                     </div>
-                    <Link href="/admin/nuevo-alumno">
-                        <Button size="sm">
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Agregar Alumno
-                        </Button>
-                    </Link>
-                </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Lista de Estudiantes ({filteredAlumnos.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Nombre</TableHead>
+                                <TableHead>Saldo</TableHead>
+                                <TableHead>Fecha de Registro</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredAlumnos.map((alumno) => (
+                                <TableRow key={alumno.id}>
+                                    <TableCell className="font-medium">{alumno.nombre}</TableCell>
+                                    <TableCell>{formatSoles(alumno.saldo)}</TableCell>
+                                    <TableCell>{new Date(alumno.fechaCreacion).toLocaleDateString('es-PE')}</TableCell>
+                                    <TableCell className="text-right space-x-2">
+                                        <Button variant="outline" size="icon" onClick={() => openModal('transaction', alumno)}><DollarSign className="h-4 w-4" /></Button>
+                                        <Button variant="outline" size="icon" onClick={() => openModal('edit', alumno)}><Edit className="h-4 w-4" /></Button>
+                                        <Button variant="destructive" size="icon" onClick={() => openModal('delete', alumno)}><Trash2 className="h-4 w-4" /></Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
 
-                {/* Estadísticas */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Total Estudiantes</CardTitle>
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{totalStudents}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{formatSoles(totalBalance)}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Saldo Promedio</CardTitle>
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{formatSoles(averageBalance)}</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Búsqueda y Tabla */}
-                <Card>
-                    <CardHeader>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Buscar por nombre..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Nombre</TableHead>
-                                        <TableHead>Saldo</TableHead>
-                                        <TableHead>Fecha de Registro</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredAlumnos.map((alumno) => (
-                                        <TableRow key={alumno.id}>
-                                            <TableCell className="font-medium">{alumno.nombre}</TableCell>
-                                            <TableCell>
-                                                <span className={`font-semibold ${alumno.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {formatSoles(alumno.saldo)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>{new Date(alumno.fechaCreacion).toLocaleDateString('es-PE')}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end space-x-2">
-                                                    <Button variant="outline" size="sm" onClick={() => handleTransaction(alumno)}>
-                                                        <DollarSign className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="outline" size="sm" onClick={() => handleEdit(alumno)}>
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="outline" size="sm" onClick={() => handleDelete(alumno)} className="text-red-600 hover:text-red-700">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                        {filteredAlumnos.length === 0 && (
-                            <div className="text-center py-8">
-                                <p>No se encontraron alumnos.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Dialog para Editar */}
-                <Dialog open={isEditing} onOpenChange={setIsEditing}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Editar Alumno</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <Label htmlFor="edit-nombre">Nombre</Label>
-                            <Input id="edit-nombre" value={editForm.nombre} onChange={(e) => setEditForm({ nombre: e.target.value })} />
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsEditing(false)}>Cancelar</Button>
-                            <Button onClick={handleUpdate} disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar Cambios'}</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Dialog para Eliminar */}
-                <Dialog open={isDeleting} onOpenChange={setIsDeleting}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center"><AlertTriangle className="h-5 w-5 text-red-500 mr-2" />Confirmar Eliminación</DialogTitle>
-                            <DialogDescription>
-                                ¿Estás seguro de que deseas eliminar a <strong>{selectedAlumno?.nombre}</strong>? Esta acción es irreversible.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsDeleting(false)}>Cancelar</Button>
-                            <Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>{isSubmitting ? 'Eliminando...' : 'Eliminar Alumno'}</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Dialog para Transacción */}
-                <Dialog open={isTransaction} onOpenChange={setIsTransaction}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Realizar Transacción para {selectedAlumno?.nombre}</DialogTitle>
-                            <DialogDescription>Saldo actual: {formatSoles(selectedAlumno?.saldo ?? 0)}</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="flex gap-2">
-                                <Button 
-                                    variant={transactionForm.tipo === 'deposito' ? 'default' : 'outline'} 
-                                    onClick={() => setTransactionForm(prev => ({...prev, tipo: 'deposito'}))}
-                                    className="flex-1"
-                                >
-                                    <PlusCircle className="h-4 w-4 mr-2" /> Depósito
-                                </Button>
-                                <Button 
-                                    variant={transactionForm.tipo === 'retiro' ? 'default' : 'outline'} 
-                                    onClick={() => setTransactionForm(prev => ({...prev, tipo: 'retiro'}))}
-                                    className="flex-1"
-                                >
-                                    <MinusCircle className="h-4 w-4 mr-2" /> Retiro
-                                </Button>
-                            </div>
-                            <div>
-                                <Label htmlFor="monto">Monto (S/)</Label>
-                                <Input 
-                                    id="monto" 
-                                    type="number" 
-                                    placeholder="0.00"
-                                    value={transactionForm.monto}
-                                    onChange={(e) => setTransactionForm(prev => ({...prev, monto: e.target.value}))}
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsTransaction(false)}>Cancelar</Button>
-                            <Button onClick={confirmTransaction} disabled={isSubmitting}>{isSubmitting ? 'Procesando...' : 'Confirmar Transacción'}</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
+            {/* Modals */}
+            <Dialog open={!!modal} onOpenChange={(isOpen) => !isOpen && setModal(null)}>
+                <DialogContent>
+                    {modal === 'edit' && <>
+                        <DialogHeader><DialogTitle>Editar Alumno</DialogTitle></DialogHeader>
+                        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                        <Label htmlFor="edit-nombre">Nombre</Label>
+                        <Input id="edit-nombre" value={editForm.nombre} onChange={(e) => setEditForm({ nombre: e.target.value })} />
+                        <DialogFooter><Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button><Button onClick={handleUpdate} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button></DialogFooter>
+                    </>}
+                    {modal === 'delete' && <>
+                        <DialogHeader><DialogTitle className="flex items-center"><AlertTriangle className="text-red-500 mr-2" />Confirmar Eliminación</DialogTitle></DialogHeader>
+                        <DialogDescription>¿Seguro que deseas eliminar a <strong>{selectedAlumno?.nombre}</strong>? Esta acción no se puede deshacer.</DialogDescription>
+                        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                        <DialogFooter><Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button><Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Eliminar</Button></DialogFooter>
+                    </>}
+                    {modal === 'transaction' && <>
+                        <DialogHeader><DialogTitle>Operación para {selectedAlumno?.nombre}</DialogTitle><DialogDescription>Saldo actual: {formatSoles(selectedAlumno?.saldo ?? 0)}</DialogDescription></DialogHeader>
+                        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                        <div className="flex gap-2"><Button variant={transactionForm.tipo === 'deposito' ? 'default' : 'outline'} onClick={() => setTransactionForm(prev => ({ ...prev, tipo: 'deposito' }))} className="flex-1"><PlusCircle className="mr-2 h-4 w-4" />Depósito</Button><Button variant={transactionForm.tipo === 'retiro' ? 'default' : 'outline'} onClick={() => setTransactionForm(prev => ({ ...prev, tipo: 'retiro' }))} className="flex-1"><MinusCircle className="mr-2 h-4 w-4" />Retiro</Button></div>
+                        <div><Label htmlFor="monto">Monto (S/)</Label><Input id="monto" type="number" placeholder="0.00" value={transactionForm.monto} onChange={(e) => setTransactionForm(prev => ({ ...prev, monto: e.target.value }))} /></div>
+                        <DialogFooter><Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button><Button onClick={confirmTransaction} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar</Button></DialogFooter>
+                    </>}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
-
-```
-
-## File: `src\app\admin\lista-alumnos\page-new.tsx`
-```tsx
-"use client";
-
-import { useEffect, useState } from 'react';
-import AlumnosClient from './page-client';
-import { createClient } from '@/lib/supabase/client';
-
-type Alumno = {
-  id: string;
-  nombre: string;
-  fechaCreacion: string;
-  cuentaId: string;
-  saldo: number;
-};
-
-export default function ListaAlumnosPage() {
-  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    const supabase = createClient();
-
-    async function fetchAlumnos() {
-      const { data, error } = await supabase
-        .from('perfiles')
-        .select(`
-          id,
-          nombre_completo,
-          fecha_creacion,
-          cuentas ( id, saldo_actual )
-        `)
-        .eq('rol', 'cliente')
-        .order('nombre_completo', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching students:', error);
-        if (mounted) setAlumnos([]);
-        return;
-      }
-
-          type PerfilConCuenta = {
-            id: string;
-            nombre_completo: string;
-            fecha_creacion: string;
-            cuentas?: { id: string; saldo_actual: number }[];
-          };
-
-          const typed = (data ?? []) as PerfilConCuenta[];
-          const mapped = typed.map((perfil) => ({
-            id: perfil.id,
-            nombre: perfil.nombre_completo,
-            fechaCreacion: perfil.fecha_creacion,
-            cuentaId: perfil.cuentas?.[0]?.id ?? '',
-            saldo: perfil.cuentas?.[0]?.saldo_actual ?? 0,
-          }));
-
-      if (mounted) setAlumnos(mapped);
-    }
-
-    fetchAlumnos().finally(() => { if (mounted) setLoading(false); });
-
-    return () => { mounted = false; };
-  }, []);
-
-  if (loading) return <div className="p-6">Cargando estudiantes...</div>;
-
-  return <AlumnosClient initialAlumnos={alumnos} />;
-}
-
 ```
 
 ## File: `src\app\admin\lista-alumnos\page.tsx`
@@ -1381,7 +1151,6 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import AlumnosClient from './page-client';
 
-// Tipamos la data que esperamos
 type AlumnoConCuenta = {
     id: string;
     nombre_completo: string;
@@ -1393,7 +1162,8 @@ type AlumnoConCuenta = {
 };
 
 async function getAlumnos() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
         .select(`id, nombre_completo, fecha_creacion, cuentas(id, saldo_actual)`)
@@ -1411,13 +1181,14 @@ async function getAlumnos() {
         id: perfil.id,
         nombre: perfil.nombre_completo,
         fechaCreacion: perfil.fecha_creacion,
-        cuentaId: perfil.cuentas[0]?.id ?? '', // Asumimos una cuenta por perfil
+        cuentaId: perfil.cuentas[0]?.id ?? '',
         saldo: perfil.cuentas[0]?.saldo_actual ?? 0,
     }));
 }
 
 export default async function ListaAlumnosPage() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect('/auth/login');
 
@@ -1430,61 +1201,40 @@ export default async function ListaAlumnosPage() {
 ```tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { createClient } from '@/lib/supabase/client';
-import { UserPlus, ArrowLeft, CheckCircle, AlertCircle, Mail, KeyRound } from 'lucide-react';
+// import deferred in handler to avoid prerender env usage
+import { UserPlus, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function NuevoAlumnoPage() {
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
     password: '',
-    montoInicial: '',
+    montoInicial: '0',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const router = useRouter();
-  const supabase = createClient();
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
-
-    if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre es obligatorio';
-    } else if (formData.nombre.trim().length < 2) {
-      newErrors.nombre = 'El nombre debe tener al menos 2 caracteres';
-    }
-
-    if (!formData.email.trim()) {
-        newErrors.email = 'El email es obligatorio';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-        newErrors.email = 'El formato del email no es válido';
-    }
-
-    if (!formData.password) {
-        newErrors.password = 'La contraseña es obligatoria';
-    } else if (formData.password.length < 6) {
-        newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
-    }
-
+    if (!formData.nombre.trim()) newErrors.nombre = 'El nombre es obligatorio';
+    if (!formData.email.trim()) newErrors.email = 'El email es obligatorio';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'El formato del email no es válido';
+    if (!formData.password) newErrors.password = 'La contraseña es obligatoria';
+    else if (formData.password.length < 6) newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
     const monto = parseFloat(formData.montoInicial);
-    if (!formData.montoInicial) {
-      newErrors.montoInicial = 'El monto inicial es obligatorio';
-    } else if (isNaN(monto)) {
-      newErrors.montoInicial = 'Debe ser un número válido';
-    } else if (monto < 0) {
-      newErrors.montoInicial = 'El monto no puede ser negativo';
-    } else if (monto > 100000) {
-      newErrors.montoInicial = 'El monto no puede exceder S/ 100,000';
-    }
-
+    if (isNaN(monto) || monto < 0) newErrors.montoInicial = 'El monto debe ser un número positivo.';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -1506,16 +1256,13 @@ export default function NuevoAlumnoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     setIsSubmitting(true);
     setErrors({});
-
     try {
-      const { error } = await supabase.functions.invoke('crear-usuario-cliente', {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data, error } = await supabase.functions.invoke('crear-usuario-cliente', {
         body: {
           nombre_completo: formData.nombre.trim(),
           email: formData.email.trim(),
@@ -1523,42 +1270,15 @@ export default function NuevoAlumnoPage() {
           saldo_inicial: parseFloat(formData.montoInicial),
         },
       });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      
+      if (error) throw new Error(data?.error || error.message);
       setShowSuccess(true);
-      
-      setFormData({
-        nombre: '',
-        email: '',
-        password: '',
-        montoInicial: '',
-      });
-
-      setTimeout(() => {
-        router.push('/admin/lista-alumnos');
-      }, 2000);
-
-    } catch (error) {
-      console.error('Error adding student:', error);
-      const err = error as Error;
-      setErrors({ general: `Error al registrar el alumno: ${err.message}` });
+      setTimeout(() => router.push('/admin/lista-alumnos'), 2000);
+    } catch (err) {
+      const error = err as Error;
+      setErrors({ general: `Error: ${error.message}` });
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleReset = () => {
-    setFormData({
-      nombre: '',
-      email: '',
-      password: '',
-      montoInicial: '',
-    });
-    setErrors({});
-    setShowSuccess(false);
   };
 
   if (showSuccess) {
@@ -1570,22 +1290,10 @@ export default function NuevoAlumnoPage() {
               <CheckCircle className="h-8 w-8" />
             </div>
             <CardTitle className="text-green-800">¡Alumno Registrado!</CardTitle>
-            <CardDescription className="text-green-700">
-              El estudiante ha sido añadido exitosamente al sistema
-            </CardDescription>
+            <CardDescription className="text-green-700">El estudiante ha sido añadido exitosamente.</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-sm text-green-700 mb-4">
-              Redirigiendo a la lista de alumnos...
-            </p>
-            <div className="flex space-x-3">
-              <Button variant="outline" onClick={handleReset} className="flex-1">
-                Registrar Otro
-              </Button>
-              <Button variant="chiti_bankGreen" asChild className="flex-1">
-                <Link href="/admin/lista-alumnos">Ver Lista</Link>
-              </Button>
-            </div>
+            <p className="text-sm text-green-700 mb-4">Redirigiendo a la lista de alumnos...</p>
           </CardContent>
         </Card>
       </div>
@@ -1594,175 +1302,68 @@ export default function NuevoAlumnoPage() {
 
   return (
     <div className="max-w-md mx-auto">
-      {/* Breadcrumb */}
       <div className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
-        <Link href="/admin" className="hover:text-chiti_bank-blue transition-colors">
-          Dashboard
-        </Link>
+        <Link href="/admin" className="hover:text-chiti_bank-blue">Dashboard</Link>
         <span>/</span>
-        <span className="text-chiti_bank-blue font-medium">Nuevo Alumno</span>
+        <Link href="/admin/lista-alumnos" className="hover:text-chiti_bank-blue">Lista de Alumnos</Link>
+        <span>/</span>
+        <span className="font-medium text-chiti_bank-blue">Nuevo Alumno</span>
       </div>
 
-      <Card className="border-2 shadow-lg">
-        <CardHeader className="text-center">
-          <div className="bg-chiti_bank-blue text-white p-3 rounded-lg w-fit mx-auto mb-4">
-            <UserPlus className="h-8 w-8" />
-          </div>
-          <CardTitle className="text-2xl text-chiti_bank-blue">Registrar Nuevo Alumno</CardTitle>
-          <CardDescription>
-            Completa la información para crear una nueva cuenta estudiantil
-          </CardDescription>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><UserPlus className="mr-2" /> Registrar Nuevo Alumno</CardTitle>
+          <CardDescription>Completa los datos para crear una nueva cuenta.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error general */}
             {errors.general && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                <p className="text-sm text-red-700">{errors.general}</p>
-              </div>
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{errors.general}</AlertDescription>
+              </Alert>
             )}
 
-            {/* Nombre */}
             <div className="space-y-2">
-              <Label htmlFor="nombre">Nombre completo del alumno</Label>
-              <Input
-                id="nombre"
-                name="nombre"
-                type="text"
-                placeholder="Ej: María González Pérez"
-                value={formData.nombre}
-                onChange={handleInputChange}
-                className={errors.nombre ? 'border-red-500' : ''}
-              />
-              {errors.nombre && (
-                <p className="text-sm text-red-600">{errors.nombre}</p>
-              )}
+              <Label htmlFor="nombre">Nombre completo</Label>
+              <Input id="nombre" name="nombre" value={formData.nombre} onChange={handleInputChange} className={errors.nombre ? 'border-red-500' : ''} />
+              {errors.nombre && <p className="text-sm text-red-600">{errors.nombre}</p>}
             </div>
 
-            {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email del alumno</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="ej: maria.gonzalez@email.com"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
-                />
-              </div>
-              {errors.email && (
-                <p className="text-sm text-red-600">{errors.email}</p>
-              )}
+              <Label htmlFor="email">Correo electrónico</Label>
+              <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} className={errors.email ? 'border-red-500' : ''} />
+              {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
             </div>
 
-            {/* Password */}
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña Temporal</Label>
-               <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className={`pl-10 ${errors.password ? 'border-red-500' : ''}`}
-                />
-              </div>
-              {errors.password && (
-                <p className="text-sm text-red-600">{errors.password}</p>
-              )}
+              <Input id="password" name="password" type="password" value={formData.password} onChange={handleInputChange} className={errors.password ? 'border-red-500' : ''} />
+              {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
             </div>
 
-            {/* Monto Inicial */}
             <div className="space-y-2">
-              <Label htmlFor="montoInicial">Monto inicial (en soles peruanos)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">S/</span>
-                <Input
-                  id="montoInicial"
-                  name="montoInicial"
-                  type="number"
-                  placeholder="0.00"
-                  value={formData.montoInicial}
-                  onChange={handleInputChange}
-                  className={`pl-10 ${errors.montoInicial ? 'border-red-500' : ''}`}
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              {errors.montoInicial && (
-                <p className="text-sm text-red-600">{errors.montoInicial}</p>
-              )}
-              <p className="text-xs text-gray-600">
-                Cantidad de dinero en soles con la que el alumno inicia su cuenta
-              </p>
+              <Label htmlFor="montoInicial">Monto inicial (S/.)</Label>
+              <Input id="montoInicial" name="montoInicial" type="number" min="0" step="0.01" value={formData.montoInicial} onChange={handleInputChange} className={errors.montoInicial ? 'border-red-500' : ''} />
+              {errors.montoInicial && <p className="text-sm text-red-600">{errors.montoInicial}</p>}
             </div>
 
-            {/* Botones */}
-            <div className="flex space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleReset}
-                className="flex-1"
-                disabled={isSubmitting}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Limpiar
-              </Button>
-              <Button
-                type="submit"
-                variant="chiti_bank"
-                className="flex-1"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Registrando...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Registrar Alumno
-                  </>
-                )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" asChild><Link href="/admin/lista-alumnos">Cancelar</Link></Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting ? 'Registrando...' : 'Registrar Alumno'}
               </Button>
             </div>
           </form>
 
-          {/* Info Card */}
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2">💡 A tener en cuenta:</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• El email debe ser único para cada alumno.</li>
-              <li>• La contraseña es temporal. El alumno deberá cambiarla.</li>
-              <li>• El saldo inicial puede ser cero.</li>
-            </ul>
-          </div>
         </CardContent>
       </Card>
 
-      {/* Navigation */}
-      <div className="mt-6 text-center">
-        <Button variant="ghost" asChild>
-          <Link href="/admin">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver al Dashboard
-          </Link>
-        </Button>
-      </div>
     </div>
   );
 }
-
 ```
 
 ## File: `src\app\admin\page.tsx`
@@ -1774,9 +1375,17 @@ import { createClient } from '@/lib/supabase/server';
 import { formatSoles } from '@/lib/utils';
 import { Users, UserPlus, Banknote, TrendingUp, ArrowRight, DollarSign } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import { Database } from '@/lib/supabase/database.types';
+
+type Profile = Database['public']['Tables']['perfiles']['Row'];
+type Account = Database['public']['Tables']['cuentas']['Row'];
+type ProfileWithAccount = Profile & {
+    cuentas: Pick<Account, 'saldo_actual'>[];
+};
 
 async function getStats() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { count, error: countError } = await supabase
       .from('perfiles')
       .select('*', { count: 'exact', head: true })
@@ -1787,7 +1396,7 @@ async function getStats() {
     const { data: accounts, error: balanceError } = await supabase.from('cuentas').select('saldo_actual');
     if (balanceError) console.error("Error fetching balances:", balanceError);
     
-    const totalBalance = accounts?.reduce((acc, curr) => acc + curr.saldo_actual, 0) ?? 0;
+    const totalBalance = accounts?.reduce((acc, curr) => acc + (curr.saldo_actual ?? 0), 0) ?? 0;
     
     return {
         totalStudents: count ?? 0,
@@ -1796,7 +1405,8 @@ async function getStats() {
 }
 
 async function getRecentStudents() {
-    const supabase = createClient();
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
         .select(`id, nombre_completo, fecha_creacion, cuentas(saldo_actual)`)
@@ -1808,17 +1418,20 @@ async function getRecentStudents() {
         console.error("Error fetching recent students:", error);
         return [];
     }
+    
+    const typedData = data as ProfileWithAccount[];
 
-    return data.map(profile => ({
+    return typedData.map(profile => ({
         id: profile.id,
         nombre: profile.nombre_completo,
         fechaCreacion: profile.fecha_creacion,
-        saldo: (profile.cuentas as any)[0]?.saldo_actual ?? 0,
+        saldo: profile.cuentas[0]?.saldo_actual ?? 0,
     }));
 }
 
 export default async function AdminDashboard() {
-  const supabase = createClient();
+  // CORRECCIÓN: Se debe usar await para el cliente de servidor
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
@@ -2054,7 +1667,7 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (token_hash && type) {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.auth.verifyOtp({
       type,
@@ -2986,7 +2599,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, LogOut, Landmark } from "lucide-react";
+import { Home, Users, LogOut, Settings } from "lucide-react"; // Cambiado Landmark por Settings
 import { Button } from "./ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -3016,13 +2629,13 @@ export function AdminNavigation() {
         {
             href: "/admin/configuracion",
             label: "Configuración",
-            icon: Landmark,
+            icon: Settings,
         },
     ];
 
     return (
         <aside className="w-64" aria-label="Sidebar">
-            <div className="px-3 py-4 overflow-y-auto rounded bg-gray-800 h-full flex flex-col">
+            <div className="px-3 py-4 overflow-y-auto rounded bg-gray-800 h-full flex flex-col min-h-screen">
                 <Link
                     href="/admin"
                     className="flex items-center pl-2.5 mb-5"
@@ -3041,7 +2654,7 @@ export function AdminNavigation() {
                 <nav className="space-y-2 flex-grow">
                     {links.map((link) => (
                         <Link
-                            key={link.href}
+                            key={link.href} // CORRECCIÓN: Añadida la prop key
                             href={link.href}
                             className={`flex items-center p-2 text-sm font-medium rounded-lg transition-colors group ${
                                 pathname.startsWith(link.href) && (link.href !== "/admin" || pathname === "/admin")
@@ -3068,7 +2681,6 @@ export function AdminNavigation() {
         </aside>
     );
 }
-
 ```
 
 ## File: `src\components\client-guard.tsx`
@@ -3635,6 +3247,8 @@ export function createClient() {
 
 ```
 
+## File: `src\lib\supabase\database.types.ts`
+_[Skipped: binary or non-UTF8 file]_
 ## File: `src\lib\supabase\middleware.ts`
 ```ts
 import { type NextRequest, NextResponse } from 'next/server'
@@ -3699,13 +3313,70 @@ export async function updateSession(request: NextRequest) {
 }
 ```
 
+## File: `src\lib\supabase\op_atomicas.db`
+```db
+-- Función para realizar transferencias de manera segura y atómica
+CREATE OR REPLACE FUNCTION public.realizar_transferencia(
+    cuenta_origen_id_param UUID,
+    numero_cuenta_destino_param TEXT,
+    monto_param NUMERIC
+)
+RETURNS VOID AS $$
+DECLARE
+    cuenta_destino_id_var UUID;
+    saldo_origen_actual NUMERIC;
+    nombre_origen_var TEXT;
+    nombre_destino_var TEXT;
+BEGIN
+    -- Validar que quien ejecuta es el dueño de la cuenta de origen
+    IF NOT EXISTS (SELECT 1 FROM public.cuentas WHERE id = cuenta_origen_id_param AND usuario_id = auth.uid()) THEN
+        RAISE EXCEPTION 'Permiso denegado: No eres el dueño de la cuenta de origen.';
+    END IF;
+
+    -- Obtener datos de la cuenta destino y bloquear la fila para evitar concurrencia
+    SELECT c.id, p.nombre_completo INTO cuenta_destino_id_var, nombre_destino_var
+    FROM public.cuentas c JOIN public.perfiles p ON c.usuario_id = p.id
+    WHERE c.numero_cuenta = numero_cuenta_destino_param FOR UPDATE;
+    
+    IF cuenta_destino_id_var IS NULL THEN
+        RAISE EXCEPTION 'La cuenta de destino no existe.';
+    END IF;
+
+    IF cuenta_destino_id_var = cuenta_origen_id_param THEN
+        RAISE EXCEPTION 'No se puede transferir a la misma cuenta.';
+    END IF;
+
+    -- Obtener saldo de origen y bloquear la fila
+    SELECT c.saldo_actual, p.nombre_completo INTO saldo_origen_actual, nombre_origen_var
+    FROM public.cuentas c JOIN public.perfiles p ON c.usuario_id = p.id
+    WHERE c.id = cuenta_origen_id_param FOR UPDATE;
+    
+    IF saldo_origen_actual < monto_param THEN
+        RAISE EXCEPTION 'Saldo insuficiente.';
+    END IF;
+    
+    -- Realizar las operaciones de actualización de saldos
+    UPDATE public.cuentas SET saldo_actual = saldo_actual - monto_param WHERE id = cuenta_origen_id_param;
+    UPDATE public.cuentas SET saldo_actual = saldo_actual + monto_param WHERE id = cuenta_destino_id_var;
+    
+    -- Registrar ambas transacciones para el historial de cada usuario
+    INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
+    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_enviada', 'Envío a ' || nombre_destino_var);
+
+    INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
+    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_recibida', 'Recibido de ' || (SELECT p.nombre_completo FROM cuentas c JOIN perfiles p ON c.usuario_id = p.id WHERE c.id = cuenta_origen_id_param));
+
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
 ## File: `src\lib\supabase\server.ts`
 ```ts
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export const createClient = () => {
-  const cookieStore = cookies()
+export const createClient = async () => {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -3803,6 +3474,36 @@ export const config = {
 ## File: `supabase\.temp\cli-latest`
 ```
 v2.39.2
+```
+
+## File: `supabase\.temp\gotrue-version`
+```
+v2.179.0
+```
+
+## File: `supabase\.temp\pooler-url`
+```
+postgresql://postgres.vimimyacwnhuiywgwwup:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:6543/postgres
+```
+
+## File: `supabase\.temp\postgres-version`
+```
+17.4.1.064
+```
+
+## File: `supabase\.temp\project-ref`
+```
+vimimyacwnhuiywgwwup
+```
+
+## File: `supabase\.temp\rest-version`
+```
+v12.2.12
+```
+
+## File: `supabase\.temp\storage-version`
+```
+v1.26.4
 ```
 
 ## File: `supabase\config.toml`
@@ -4109,16 +3810,6 @@ export const corsHeaders = {
 
 ```
 
-## File: `supabase\functions\_shared\supabaseAdmin.ts`
-```ts
-# Supabase client with SERVICE_ROLE key
-```
-
-## File: `supabase\functions\_shared\supabaseClient.ts`
-```ts
-# Supabase client with ANON key
-```
-
 ## File: `supabase\functions\crear-usuario-cliente\index.ts`
 ```ts
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
@@ -4268,11 +3959,6 @@ serve(async (req: Request) => {
     });
   }
 });
-```
-
-## File: `supabase\functions\import_map.jso`
-```jso
-
 ```
 
 ## File: `supabase\functions\iniciar-transferencia-cliente\index.ts`

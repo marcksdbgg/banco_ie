@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+export const dynamic = 'force-dynamic';
+
 import { createClient } from '@/lib/supabase/client';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +14,6 @@ import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function TransferPage() {
     const router = useRouter();
-    const supabase = createClient();
     const [numeroCuentaDestino, setNumeroCuentaDestino] = useState('');
     const [monto, setMonto] = useState('');
     const [loading, setLoading] = useState(false);
@@ -32,37 +33,21 @@ export default function TransferPage() {
         setLoading(true);
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('Usuario no autenticado.');
-
-            // La cuenta de origen se debe obtener por el `usuario_id` que corresponde al `user.id` del usuario autenticado.
-            const { data: cuentaOrigen, error: cuentaOrigenError } = await supabase
-                .from('cuentas')
-                .select('id')
-                .eq('usuario_id', user.id)
-                .single();
-
-            if (cuentaOrigenError || !cuentaOrigen) {
-                console.error('Error fetching origin account:', cuentaOrigenError);
-                throw new Error('No se pudo encontrar tu cuenta de origen. Asegúrate de tener una cuenta asignada.');
-            }
-
-            const { data, error: functionError } = await supabase.functions.invoke('realizar-transaccion', {
+            const supabase = createClient();
+            
+            const { data, error: functionError } = await supabase.functions.invoke('iniciar-transferencia-cliente', {
                 body: {
-                    tipo: 'transferencia',
+                    numero_cuenta_destino: numeroCuentaDestino,
                     monto: parseFloat(monto),
-                    cuentaOrigenId: cuentaOrigen.id,
-                    numeroCuentaDestino: numeroCuentaDestino,
                 },
             });
 
             if (functionError) {
-                // The error from the Edge Function is often in the 'message' property of the response
                 const errorMessage = functionError.context?.msg ?? functionError.message;
                 throw new Error(errorMessage);
             }
-
-            if (data.error) {
+            
+            if (data?.error) {
                 throw new Error(data.error);
             }
 
@@ -72,6 +57,7 @@ export default function TransferPage() {
 
             setTimeout(() => {
                 router.push('/dashboard');
+                router.refresh();
             }, 2000);
 
         } catch (err) {
