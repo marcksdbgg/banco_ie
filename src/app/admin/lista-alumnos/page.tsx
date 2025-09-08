@@ -32,8 +32,8 @@ async function getAlumnos() {
         id: perfil.id,
         nombre: perfil.nombre_completo,
         fechaCreacion: perfil.fecha_creacion,
-        cuentaId: perfil.cuentas[0]?.id ?? '',
-        saldo: perfil.cuentas[0]?.saldo_actual ?? 0,
+        cuentaId: perfil.cuentas?.[0]?.id ?? '',
+        saldo: perfil.cuentas?.[0]?.saldo_actual ?? 0,
     }));
 }
 

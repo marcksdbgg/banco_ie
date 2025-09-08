@@ -51,12 +51,12 @@ async function getRecentStudents() {
     
     const typedData = data as ProfileWithAccount[];
 
-    return typedData.map(profile => ({
-        id: profile.id,
-        nombre: profile.nombre_completo,
-        fechaCreacion: profile.fecha_creacion,
-        saldo: profile.cuentas[0]?.saldo_actual ?? 0,
-    }));
+  return typedData.map(profile => ({
+    id: profile.id,
+    nombre: profile.nombre_completo,
+    fechaCreacion: profile.fecha_creacion,
+    saldo: profile.cuentas?.[0]?.saldo_actual ?? 0,
+  }));
 }
 
 export default async function AdminDashboard() {
