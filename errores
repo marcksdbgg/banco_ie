@@ -1,0 +1,7 @@
+Ahora analiza el md de la descripción de la base de datos, deberás de analizar como se realiza el proceso de regristrode nuevos clientes en el banco, en este caso se hace desde la vista de administrador y también se puede hacer desde la pagina principal registrandose. 
+
+Existe un error al tratar de hacer login con una cuenta de cliente aparece el error "No se encontró una cuenta asociada.
+
+Por favor, contacte a un administrador." esto esta mal debería de aparecer el dashboard del cliente correctamente, a que se debe este error? Además si se creo la cuenta desde la pagina principal tendrá 0 soles y si la creo un adinistrativo desde el panel de administración deberá de tener el monto que este le asigno al momento de crear la cuenta. 
+
+Ananliza toda la codebase al completo y detallado y dime donde esta el error que se tieen que solventar y como mejorar correctamente todo el código,deberás de comprender la estructura de db para esto. 
