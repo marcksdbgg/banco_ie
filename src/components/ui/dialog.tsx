@@ -15,7 +15,7 @@ const Dialog = React.forwardRef<
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => onOpenChange?.(false)}
       />
       
@@ -23,9 +23,10 @@ const Dialog = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "relative z-50 max-w-lg w-full mx-4 bg-background rounded-lg shadow-lg",
+          "relative z-50 max-w-lg w-full mx-4 bg-background bg-white dark:bg-black rounded-lg shadow-xl",
           className
         )}
+        style={{ backgroundColor: 'hsl(var(--card))' }}
         {...props}
       >
         {children}

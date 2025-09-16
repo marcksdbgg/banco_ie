@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,10 @@ type AlumnosClientProps = {
 };
 
 export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
-    const [alumnos] = useState(initialAlumnos);
+    const [alumnos, setAlumnos] = useState(initialAlumnos);
+    useEffect(() => {
+        setAlumnos(initialAlumnos);
+    }, [initialAlumnos]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAlumno, setSelectedAlumno] = useState<Alumno | null>(null);
     const [modal, setModal] = useState<'edit' | 'delete' | 'transaction' | null>(null);
@@ -72,11 +75,26 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
         }
         setIsSubmitting(true);
         const supabase = createClient();
-        const { error } = await supabase.functions.invoke('gestionar-fondos', {
+        interface InvokeResultWithData { error?: { message: string }; data?: { nuevoSaldo?: number } }
+        interface InvokeResultDirect { message?: string; nuevoSaldo?: number }
+        const invokeRespRaw = await supabase.functions.invoke('gestionar-fondos', {
             body: { tipo: transactionForm.tipo, cuenta_id: selectedAlumno.cuentaId, monto },
         });
+        const invokeResp = invokeRespRaw as InvokeResultWithData | InvokeResultDirect;
+        const error = (invokeResp as InvokeResultWithData).error;
+        const data = (invokeResp as InvokeResultWithData).data ?? (invokeResp as InvokeResultDirect);
         if (!error) {
-            router.refresh();
+            // If the function returns the new balance, update local state for immediate UI feedback
+            function hasNuevoSaldo(obj: unknown): obj is { nuevoSaldo?: number } {
+                return typeof obj === 'object' && obj !== null && 'nuevoSaldo' in obj;
+            }
+            const nuevoSaldo = hasNuevoSaldo(data) ? data.nuevoSaldo : undefined;
+            if (nuevoSaldo !== null && nuevoSaldo !== undefined) {
+                setAlumnos(prev => prev.map(a => a.id === selectedAlumno.id ? { ...a, saldo: Number(nuevoSaldo) } : a));
+            } else {
+                // fallback: refresh server data
+                try { router.refresh(); } catch {};
+            }
             setModal(null);
         } else {
             setError(error.message);
