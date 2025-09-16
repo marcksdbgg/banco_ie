@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 // ...existing imports...
 import { UserPlus, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -62,9 +63,18 @@ export default function NuevoAlumnoPage() {
     setErrors({});
       try {
       // Llamamos al endpoint server-side que valida admin y reenvía a la Edge Function
+      // Incluimos el token de sesión actual en Authorization para que el server
+      // route/Edge Function pueda validar el rol cuando no se usa el admin secret.
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const resp = await fetch('/api/admin/crear-usuario', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           nombre_completo: formData.nombre.trim(),
           email: formData.email.trim(),

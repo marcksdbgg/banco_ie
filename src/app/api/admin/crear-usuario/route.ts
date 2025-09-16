@@ -25,14 +25,22 @@ export async function POST(req: Request) {
     const body = (await req.json()) as CreateUserBody;
     const adminSecret = process.env.ADMIN_CREATE_SECRET || '';
 
-    // Call Edge Function with service secret header
+    // Prepare headers to call Edge Function. Forward Authorization if present.
     const edgeUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '') + '/functions/v1/crear-usuario-cliente';
+    const forwardHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const incomingAuth = req.headers.get('authorization');
+    if (incomingAuth) {
+      forwardHeaders['Authorization'] = incomingAuth;
+    }
+    if (adminSecret) {
+      forwardHeaders['x-admin-secret'] = adminSecret;
+    }
+
     const resp = await fetch(edgeUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-secret': adminSecret
-      },
+      headers: forwardHeaders,
       body: JSON.stringify(body)
     });
     const json = await resp.json();
