@@ -1,3 +1,5 @@
+// src/app/auth/register/page.tsx
+
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -39,43 +41,39 @@ export default function RegisterPage() {
       setError('Las contraseñas no coinciden.');
       return;
     }
+    if (formData.password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres.');
+        return;
+    }
 
     setLoading(true);
 
     try {
       const supabase = createClient();
-      // Llamamos a la Edge Function pública que crea Auth + perfil + cuenta con saldo 0
-      const res = await supabase.functions.invoke('crear-usuario-cliente', {
-        body: { nombre_completo: formData.fullName, email: formData.email, password: formData.password, saldo_inicial: 0, rol: 'cliente', tipo: 'alumno' }
+      
+      const { data, error: invokeError } = await supabase.functions.invoke('crear-usuario-cliente', {
+        body: { 
+          nombre_completo: formData.fullName, 
+          email: formData.email, 
+          password: formData.password 
+        } // El saldo, rol y tipo son definidos por la función para registros públicos
       });
 
-      // The SDK returns a Response-like object; attempt to parse json safely
-      let json: unknown;
-      try {
-        // Some runtimes return a raw object, others a Response-like object
-  const maybe = res as unknown;
-  const maybeJsonFn = typeof (maybe as { json?: unknown }).json === 'function' ? (maybe as { json: () => Promise<unknown> }).json : undefined;
-  json = typeof maybeJsonFn === 'function' ? await maybeJsonFn.call(res) : res;
-      } catch {
-        json = res;
+      if (invokeError) throw invokeError;
+      
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
-      const isErrorLike = (obj: unknown): obj is { error?: unknown } => {
-        return !!obj && typeof obj === 'object' && 'error' in (obj as Record<string, unknown>);
-      };
+      setSuccess('¡Registro exitoso! Ya puedes iniciar sesión.');
+      setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
 
-      if (isErrorLike(json) && json.error) {
-        setError(String(json.error) || 'Error al registrar usuario.');
-      } else {
-        setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
-        setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
-      }
     } catch (err) {
-      const unknownErr = err as unknown;
-      const message = unknownErr instanceof Error ? unknownErr.message : String(unknownErr);
-      setError(message || 'Error al registrar usuario.');
+      const error = err as Error;
+      setError(error.message || 'Ocurrió un error inesperado durante el registro.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

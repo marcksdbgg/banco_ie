@@ -1,3 +1,5 @@
+// src/app/admin/nuevo-alumno/page.tsx
+
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// ...existing imports...
 import { UserPlus, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -21,7 +22,7 @@ export default function NuevoAlumnoPage() {
     email: '',
     password: '',
     montoInicial: '0',
-    rol: 'alumno',
+    rol: 'alumno', // 'rol' aquí se usa para el tipo de perfil en la UI
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -42,17 +43,10 @@ export default function NuevoAlumnoPage() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target as HTMLInputElement | HTMLSelectElement;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
@@ -61,40 +55,44 @@ export default function NuevoAlumnoPage() {
     if (!validateForm()) return;
     setIsSubmitting(true);
     setErrors({});
-      try {
-      // Llamamos al endpoint server-side que valida admin y reenvía a la Edge Function
-      // Incluimos el token de sesión actual en Authorization para que el server
-      // route/Edge Function pueda validar el rol cuando no se usa el admin secret.
+      
+    try {
+      // CORRECCIÓN: Llamamos directamente a la Edge Function usando el SDK de Supabase.
+      // El SDK se encargará de adjuntar el token de autorización del administrador logueado,
+      // permitiendo a la Edge Function validar el rol y ejecutar la lógica privilegiada.
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
 
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const resp = await fetch('/api/admin/crear-usuario', {
-        method: 'POST',
-        headers,
-        // ensure cookies (session) are sent to the server route when present
-        credentials: 'include',
-        body: JSON.stringify({
+      const { data, error: invokeError } = await supabase.functions.invoke('crear-usuario-cliente', {
+        body: {
           nombre_completo: formData.nombre.trim(),
           email: formData.email.trim(),
           password: formData.password,
           saldo_inicial: parseFloat(formData.montoInicial),
-          // Mapear: si es 'personal' entonces rol='personal' (no cliente),
-          // en caso contrario el rol de auth será 'cliente' y usamos 'tipo' para diferenciar
+          // Mapeo correcto de rol y tipo para la base de datos
           rol: formData.rol === 'personal' ? 'personal' : 'cliente',
-          tipo: formData.rol || 'alumno'
-        })
+          tipo: formData.rol, // 'alumno', 'padre', o 'personal'
+        },
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.error || 'Error creating user');
+
+      if (invokeError) {
+        // Captura errores de red o de la llamada a la función
+        throw invokeError;
+      }
+      
+      if (data?.error) {
+        // Captura errores lógicos devueltos en el cuerpo de la respuesta de la función
+        throw new Error(data.error);
+      }
+
       setShowSuccess(true);
-      setTimeout(() => router.push('/admin/lista-alumnos'), 2000);
+      setTimeout(() => {
+        router.push('/admin/lista-alumnos');
+        router.refresh(); // Aseguramos que la lista de alumnos se actualice
+      }, 2000);
+
     } catch (err) {
       const error = err as Error;
-      setErrors({ general: `Error: ${error.message}` });
+      setErrors({ general: `Error al crear el usuario: ${error.message}` });
     } finally {
       setIsSubmitting(false);
     }
@@ -108,8 +106,8 @@ export default function NuevoAlumnoPage() {
             <div className="bg-green-500 text-white p-3 rounded-full w-fit mx-auto mb-4">
               <CheckCircle className="h-8 w-8" />
             </div>
-            <CardTitle className="text-green-800">¡Alumno Registrado!</CardTitle>
-            <CardDescription className="text-green-700">El estudiante ha sido añadido exitosamente.</CardDescription>
+            <CardTitle className="text-green-800">¡Usuario Registrado!</CardTitle>
+            <CardDescription className="text-green-700">El usuario y su cuenta han sido creados exitosamente.</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-sm text-green-700 mb-4">Redirigiendo a la lista de alumnos...</p>
@@ -126,12 +124,12 @@ export default function NuevoAlumnoPage() {
         <span>/</span>
         <Link href="/admin/lista-alumnos" className="hover:text-chiti_bank-blue">Lista de Alumnos</Link>
         <span>/</span>
-        <span className="font-medium text-chiti_bank-blue">Nuevo Alumno</span>
+        <span className="font-medium text-chiti_bank-blue">Nuevo Usuario</span>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center"><UserPlus className="mr-2" /> Registrar Nuevo Alumno</CardTitle>
+          <CardTitle className="flex items-center"><UserPlus className="mr-2" /> Registrar Nuevo Usuario</CardTitle>
           <CardDescription>Completa los datos para crear una nueva cuenta.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -169,8 +167,8 @@ export default function NuevoAlumnoPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rol">Rol</Label>
-              <select id="rol" name="rol" value={formData.rol} onChange={handleInputChange} className="w-full border rounded p-2">
+              <Label htmlFor="rol">Tipo de Perfil</Label>
+              <select id="rol" name="rol" value={formData.rol} onChange={handleInputChange} className="w-full border rounded p-2 bg-white text-sm">
                 <option value="alumno">Alumno</option>
                 <option value="padre">Padre de Familia</option>
                 <option value="personal">Personal de la IE</option>
@@ -181,7 +179,7 @@ export default function NuevoAlumnoPage() {
               <Button type="button" variant="ghost" asChild><Link href="/admin/lista-alumnos">Cancelar</Link></Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? 'Registrando...' : 'Registrar Alumno'}
+                {isSubmitting ? 'Registrando...' : 'Registrar Usuario'}
               </Button>
             </div>
           </form>

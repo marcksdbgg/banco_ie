@@ -113,7 +113,7 @@
      - `page.tsx` — admin dashboard con métricas.
      - `configuracion/page.tsx` — configuración del banco/escuela.
      - `lista-alumnos/page.tsx` & `page-client.tsx` — listado de estudiantes (client/server variants).
-     - `nuevo-alumno/page.tsx` — formulario para crear alumnos desde admin (usa `/api/admin/crear-usuario` server route que llama a la Edge Function con un secret).
+     - `nuevo-alumno/page.tsx` — formulario para crear alumnos desde admin (invoca directamente la Edge Function `crear-usuario-cliente` usando el SDK de Supabase; ya no existe un proxy server-side por defecto).
  - `src/app/api/drive-scrape/route.ts` — ejemplo de API route para scraping o integración con Google Drive (puede ser un util interno).
 
  Componentes y utilidades clave (`src/components` y `src/lib`):
@@ -134,12 +134,12 @@
      - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anon public key (solo para client SDK).
  - Para server-side (Vercel/Server routes):
      - `SUPABASE_SERVICE_ROLE_KEY` — clave con privilegios server (NO exponer al cliente).
-     - `ADMIN_CREATE_SECRET` — secreto para permitir que el endpoint `/api/admin/crear-usuario` invoque la Edge Function en modo admin.
+    - `ADMIN_CREATE_SECRET` — (opcional/legacy) secreto que se usaba cuando se proxyaba la llamada a través de un endpoint server-side. Con la llamada directa desde el admin UI a la Edge Function, este secreto no es estrictamente necesario; la función valida Authorization Bearer tokens o `x-admin-secret` si configurado.
  - Para Supabase Functions (en el dashboard de Supabase):
      - `SUPABASE_URL`
      - `SUPABASE_ANON_KEY`
      - `SUPABASE_SERVICE_ROLE_KEY` (en variables de función; necesario para crear usuarios y manipular DB)
-     - `ADMIN_CREATE_SECRET` (si la función lo verifica)
+    - `ADMIN_CREATE_SECRET` (opcional) — si quieres que la Edge Function permita una segunda vía de autenticación administrativa basada en un secreto compartido (por ejemplo para proxies o sistemas externos), puedes configurar `ADMIN_CREATE_SECRET` en las variables de la función. No es obligatorio cuando la UI usa el SDK y pasa Authorization Bearer tokens.
 
  Despliegue recomendado:
  1. Aplicar migraciones en Supabase (ordenadas): `supabase/migrations/001_...`, luego `002_...`.
@@ -162,7 +162,8 @@
  NEXT_PUBLIC_SUPABASE_URL=<your_supabase_url>
  NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_anon_key>
  SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
- ADMIN_CREATE_SECRET=<random_secret_for_admin_calls>
+# ADMIN_CREATE_SECRET is optional and only needed if you use a proxy flow
+# ADMIN_CREATE_SECRET=<random_secret_for_admin_calls>
  ```
  - Desarrollar en local:
  ```powershell
