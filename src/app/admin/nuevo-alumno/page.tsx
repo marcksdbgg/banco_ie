@@ -75,6 +75,8 @@ export default function NuevoAlumnoPage() {
       const resp = await fetch('/api/admin/crear-usuario', {
         method: 'POST',
         headers,
+        // ensure cookies (session) are sent to the server route when present
+        credentials: 'include',
         body: JSON.stringify({
           nombre_completo: formData.nombre.trim(),
           email: formData.email.trim(),

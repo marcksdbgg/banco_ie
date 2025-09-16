@@ -38,6 +38,9 @@ export async function POST(req: Request) {
     };
 
     const body = (await req.json()) as CreateUserBody;
+    try {
+      console.log('[admin/crear-usuario] received body sample:', { nombre: body.nombre_completo, email: body.email, saldo_inicial: body.saldo_inicial });
+    } catch {}
     const adminSecret = process.env.ADMIN_CREATE_SECRET || '';
 
     // Prepare headers to call Edge Function. Forward Authorization if present.

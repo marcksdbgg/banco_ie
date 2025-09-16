@@ -23,7 +23,7 @@ serve(async (req: Request) => {
     const body = await req.json();
   let { nombre_completo, email, password, saldo_inicial, rol, tipo } = body as any;
 
-    // Seguridad: determinar si el caller es admin.
+  // Seguridad: determinar si el caller es admin.
     // 1) Si se proporciona x-admin-secret y coincide con ADMIN_CREATE_SECRET, es admin.
     const providedAdminSecret = req.headers.get('x-admin-secret') || '';
     const adminSecret = Deno.env.get('ADMIN_CREATE_SECRET') || '';
@@ -53,6 +53,15 @@ serve(async (req: Request) => {
           // ignore and treat as non-admin
         }
       }
+    }
+
+    // Logging diagnóstico mínimo (enmascarar secret/token)
+    try {
+      const providedAdminSecretLog = providedAdminSecret ? 'present' : 'absent';
+      const authHeaderLog = req.headers.get('authorization') ? 'present' : 'absent';
+      console.log('[crear-usuario-cliente] adminSecret(env):', !!adminSecret, 'providedAdminSecret:', providedAdminSecretLog, 'authHeader:', authHeaderLog, 'isAdminCall(initial):', isAdminCall);
+    } catch (lErr) {
+      // ignore
     }
 
     // Si no es llamada admin, forzamos saldo a 0 y rol a 'cliente'
@@ -92,7 +101,10 @@ serve(async (req: Request) => {
     try {
       const rpcResp = await supabaseAdmin.rpc('create_account_for_user', { p_usuario_id: user.id, p_saldo: saldo_inicial });
       if (rpcResp.error) throw rpcResp.error;
-      cuentaData = rpcResp.data;
+      // Normalizar la forma de retorno del RPC: puede venir como array o fila directa
+      if (Array.isArray(rpcResp.data)) cuentaData = rpcResp.data[0];
+      else cuentaData = rpcResp.data;
+      console.log('[crear-usuario-cliente] rpc create_account_for_user result:', { cuentaId: cuentaData?.id, numero_cuenta: cuentaData?.numero_cuenta, saldo: cuentaData?.saldo_actual });
     } catch (rpcErr) {
       // Si la función RPC no existe o falla, hacemos fallback a inserción con reintentos
       let cuentaError: any = null;
@@ -114,19 +126,37 @@ serve(async (req: Request) => {
     }
 
     // 4. Registrar depósito inicial si es mayor a cero
+    let nuevoSaldo = cuentaData?.saldo_actual ?? saldo_inicial;
     if (saldo_inicial > 0) {
-      const { error: transaccionError } = await supabaseAdmin
-        .from('transacciones')
-        .insert({
-          cuenta_destino_id: cuentaData.id,
-          monto: saldo_inicial,
-          tipo: 'deposito',
-          descripcion: 'Depósito inicial de cuenta'
-        });
-      if (transaccionError) throw transaccionError;
+      try {
+        const { data: transData, error: transaccionError } = await supabaseAdmin
+          .from('transacciones')
+          .insert({
+            cuenta_destino_id: cuentaData.id,
+            monto: saldo_inicial,
+            tipo: 'deposito',
+            descripcion: 'Depósito inicial de cuenta'
+          })
+          .select('id')
+          .single();
+        if (transaccionError) throw transaccionError;
+        console.log('[crear-usuario-cliente] transaccion insertada, id:', transData?.id);
+      } catch (txErr) {
+        console.error('[crear-usuario-cliente] error al insertar transaccion inicial:', txErr);
+        throw txErr;
+      }
     }
 
-    return new Response(JSON.stringify({ userId: user.id, message: "Usuario y cuenta creados exitosamente." }), {
+    // Asegurar que devolvemos información útil para el caller
+    const responsePayload = {
+      userId: user.id,
+      cuentaId: cuentaData?.id,
+      numero_cuenta: cuentaData?.numero_cuenta,
+      saldo_inicial: saldo_inicial,
+      message: 'Usuario y cuenta creados exitosamente.'
+    };
+    console.log('[crear-usuario-cliente] success response:', responsePayload);
+    return new Response(JSON.stringify(responsePayload), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201,
     });
