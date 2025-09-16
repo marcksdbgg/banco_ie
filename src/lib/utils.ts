@@ -6,14 +6,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatSoles(amount: number): string {
-  if (typeof amount !== 'number') {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(0);
-  }
+  // Accept number or numeric string; fallback to 0
+  const value = typeof amount === 'number' ? amount : Number(amount);
+  const safe = Number.isFinite(value) ? value : 0;
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
     currency: 'PEN',
-  }).format(amount);
+  }).format(safe);
 }

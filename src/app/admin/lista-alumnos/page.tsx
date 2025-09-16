@@ -6,6 +6,7 @@ type AlumnoConCuenta = {
     id: string;
     nombre_completo: string;
     fecha_creacion: string;
+    tipo?: string;
     cuentas: {
         id: string;
         saldo_actual: number;
@@ -17,7 +18,8 @@ async function getAlumnos() {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
-        .select(`id, nombre_completo, fecha_creacion, cuentas(id, saldo_actual)`)
+        // include `tipo` so the UI can show what kind of cliente it is
+        .select(`id, nombre_completo, fecha_creacion, tipo, cuentas(id, saldo_actual)`) 
         .eq('rol', 'cliente')
         .order('nombre_completo', { ascending: true });
 
@@ -33,7 +35,9 @@ async function getAlumnos() {
         nombre: perfil.nombre_completo,
         fechaCreacion: perfil.fecha_creacion,
         cuentaId: perfil.cuentas?.[0]?.id ?? '',
+        // ensure numeric conversion (supabase may return numeric as string)
         saldo: Number(perfil.cuentas?.[0]?.saldo_actual) || 0,
+        tipo: perfil.tipo ?? 'alumno',
     }));
 }
 

@@ -19,6 +19,7 @@ type Alumno = {
     fechaCreacion: string;
     cuentaId: string;
     saldo: number;
+    tipo?: string;
 };
 
 type AlumnosClientProps = {
@@ -118,7 +119,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Búsqueda de Alumnos</CardTitle>
+                    <CardTitle>Búsqueda de Clientes</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="relative">
@@ -129,13 +130,14 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle>Lista de Estudiantes ({filteredAlumnos.length})</CardTitle>
+                    <CardTitle>Lista de Clientes ({filteredAlumnos.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
+                                <TableHead>Tipo</TableHead>
                                 <TableHead>Saldo</TableHead>
                                 <TableHead>Fecha de Registro</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
@@ -145,6 +147,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
                             {filteredAlumnos.map((alumno) => (
                                 <TableRow key={alumno.id}>
                                     <TableCell className="font-medium">{alumno.nombre}</TableCell>
+                                    <TableCell className="capitalize">{alumno.tipo ?? 'alumno'}</TableCell>
                                     <TableCell>{formatSoles(alumno.saldo)}</TableCell>
                                     <TableCell>{new Date(alumno.fechaCreacion).toLocaleDateString('es-PE')}</TableCell>
                                     <TableCell className="text-right space-x-2">
