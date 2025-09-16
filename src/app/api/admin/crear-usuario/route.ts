@@ -16,7 +16,7 @@ export async function POST(req: Request) {
         masked = token ? `${token.slice(0, 6)}...${token.slice(-6)}` : '';
       }
       console.log('[admin/crear-usuario] incoming Authorization present:', hasAuth, 'masked:', masked, 'server-user-present:', !!user);
-    } catch (logErr) {
+    } catch {
       // ignore logging errors
     }
 
