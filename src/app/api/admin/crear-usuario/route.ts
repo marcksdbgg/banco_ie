@@ -5,6 +5,21 @@ export async function POST(req: Request) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
+
+    // Diagnostic logging (mask sensitive parts)
+    try {
+      const incomingAuth = req.headers.get('authorization');
+      const hasAuth = !!incomingAuth;
+      let masked = '';
+      if (hasAuth) {
+        const token = incomingAuth?.split(' ')[1] || '';
+        masked = token ? `${token.slice(0, 6)}...${token.slice(-6)}` : '';
+      }
+      console.log('[admin/crear-usuario] incoming Authorization present:', hasAuth, 'masked:', masked, 'server-user-present:', !!user);
+    } catch (logErr) {
+      // ignore logging errors
+    }
+
     // Validar que el caller está autenticado y tiene rol admin/personal
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
