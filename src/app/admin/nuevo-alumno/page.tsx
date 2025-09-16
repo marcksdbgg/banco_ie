@@ -21,6 +21,7 @@ export default function NuevoAlumnoPage() {
     email: '',
     password: '',
     montoInicial: '0',
+    rol: 'alumno',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -40,8 +41,8 @@ export default function NuevoAlumnoPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target as HTMLInputElement | HTMLSelectElement;
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -60,17 +61,24 @@ export default function NuevoAlumnoPage() {
     if (!validateForm()) return;
     setIsSubmitting(true);
     setErrors({});
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.functions.invoke('crear-usuario-cliente', {
-        body: {
+      try {
+      // Llamamos al endpoint server-side que valida admin y reenvía a la Edge Function
+      const resp = await fetch('/api/admin/crear-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           nombre_completo: formData.nombre.trim(),
           email: formData.email.trim(),
           password: formData.password,
           saldo_inicial: parseFloat(formData.montoInicial),
-        },
+          // Mapear: si es 'personal' entonces rol='personal' (no cliente),
+          // en caso contrario el rol de auth será 'cliente' y usamos 'tipo' para diferenciar
+          rol: formData.rol === 'personal' ? 'personal' : 'cliente',
+          tipo: formData.rol || 'alumno'
+        })
       });
-      if (error) throw new Error(data?.error || error.message);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || 'Error creating user');
       setShowSuccess(true);
       setTimeout(() => router.push('/admin/lista-alumnos'), 2000);
     } catch (err) {
@@ -147,6 +155,15 @@ export default function NuevoAlumnoPage() {
               <Label htmlFor="montoInicial">Monto inicial (S/.)</Label>
               <Input id="montoInicial" name="montoInicial" type="number" min="0" step="0.01" value={formData.montoInicial} onChange={handleInputChange} className={errors.montoInicial ? 'border-red-500' : ''} />
               {errors.montoInicial && <p className="text-sm text-red-600">{errors.montoInicial}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rol">Rol</Label>
+              <select id="rol" name="rol" value={formData.rol} onChange={handleInputChange} className="w-full border rounded p-2">
+                <option value="alumno">Alumno</option>
+                <option value="padre">Padre de Familia</option>
+                <option value="personal">Personal de la IE</option>
+              </select>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

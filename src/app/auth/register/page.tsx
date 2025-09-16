@@ -42,34 +42,21 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
+      // Llamamos a la Edge Function pública que crea Auth + perfil + cuenta con saldo 0
+      const res = await supabase.functions.invoke('crear-usuario-cliente', {
+        body: { nombre_completo: formData.fullName, email: formData.email, password: formData.password, saldo_inicial: 0, rol: 'cliente', tipo: 'alumno' }
+      });
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    });
-
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('perfiles')
-        .insert({ 
-            id: data.user.id, 
-            nombre_completo: formData.fullName, 
-            rol: 'cliente'
-        });
-
-      if (profileError) {
-        setError(`Error al crear el perfil: ${profileError.message}`);
+      if ((res as any).error) {
+        setError((res as any).error || 'Error al registrar usuario.');
       } else {
         setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
         setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
       }
+    } catch (err: any) {
+      setError(err?.message || 'Error al registrar usuario.');
     }
     setLoading(false);
   };
