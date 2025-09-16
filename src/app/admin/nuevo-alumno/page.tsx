@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// CORRECCIÓN: Se añade la importación que faltaba del cliente de Supabase para el navegador.
-import { createClient } from '@/lib/supabase/client';
+// ...existing imports...
 import { UserPlus, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';

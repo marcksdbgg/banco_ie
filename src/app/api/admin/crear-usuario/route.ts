@@ -13,7 +13,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await req.json();
+    type CreateUserBody = {
+      nombre_completo: string;
+      email: string;
+      password: string;
+      saldo_inicial?: number;
+      rol?: string;
+      tipo?: string;
+    };
+
+    const body = (await req.json()) as CreateUserBody;
     const adminSecret = process.env.ADMIN_CREATE_SECRET || '';
 
     // Call Edge Function with service secret header
@@ -28,7 +37,8 @@ export async function POST(req: Request) {
     });
     const json = await resp.json();
     return NextResponse.json(json, { status: resp.status });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

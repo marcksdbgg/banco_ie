@@ -49,14 +49,31 @@ export default function RegisterPage() {
         body: { nombre_completo: formData.fullName, email: formData.email, password: formData.password, saldo_inicial: 0, rol: 'cliente', tipo: 'alumno' }
       });
 
-      if ((res as any).error) {
-        setError((res as any).error || 'Error al registrar usuario.');
+      // The SDK returns a Response-like object; attempt to parse json safely
+      let json: unknown;
+      try {
+        // Some runtimes return a raw object, others a Response-like object
+  const maybe = res as unknown;
+  const maybeJsonFn = typeof (maybe as { json?: unknown }).json === 'function' ? (maybe as { json: () => Promise<unknown> }).json : undefined;
+  json = typeof maybeJsonFn === 'function' ? await maybeJsonFn.call(res) : res;
+      } catch {
+        json = res;
+      }
+
+      const isErrorLike = (obj: unknown): obj is { error?: unknown } => {
+        return !!obj && typeof obj === 'object' && 'error' in (obj as Record<string, unknown>);
+      };
+
+      if (isErrorLike(json) && json.error) {
+        setError(String(json.error) || 'Error al registrar usuario.');
       } else {
         setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
         setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
       }
-    } catch (err: any) {
-      setError(err?.message || 'Error al registrar usuario.');
+    } catch (err) {
+      const unknownErr = err as unknown;
+      const message = unknownErr instanceof Error ? unknownErr.message : String(unknownErr);
+      setError(message || 'Error al registrar usuario.');
     }
     setLoading(false);
   };
