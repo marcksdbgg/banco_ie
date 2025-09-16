@@ -4,6 +4,8 @@
 banco_ie/
 ├── .env.local
 ├── .gitignore
+├── SUPABASE_DATABASE.md
+├── errores
 ├── eslint.config.mjs
 ├── export-codebase.py
 ├── next-env.d.ts
@@ -17,7 +19,6 @@ banco_ie/
 │   ├── next.svg
 │   ├── vercel.svg
 │   └── window.svg
-├── refactor.md
 ├── src
 │   ├── app
 │   │   ├── (cliente)
@@ -37,6 +38,9 @@ banco_ie/
 │   │   │   │   └── page.tsx
 │   │   │   └── page.tsx
 │   │   ├── api
+│   │   │   ├── admin
+│   │   │   │   └── crear-usuario
+│   │   │   │       └── route.ts
 │   │   │   └── drive-scrape
 │   │   │       └── route.ts
 │   │   ├── auth
@@ -86,15 +90,20 @@ banco_ie/
 │   │   ├── rest-version
 │   │   └── storage-version
 │   ├── config.toml
-│   └── functions
-│       ├── _shared
-│       │   └── cors.ts
-│       ├── crear-usuario-cliente
-│       │   └── index.ts
-│       ├── gestionar-fondos
-│       │   └── index.ts
-│       └── iniciar-transferencia-cliente
-│           └── index.ts
+│   ├── functions
+│   │   ├── _shared
+│   │   │   └── cors.ts
+│   │   ├── crear-usuario-cliente
+│   │   │   ├── _shared
+│   │   │   │   └── cors.ts
+│   │   │   └── index.ts
+│   │   ├── gestionar-fondos
+│   │   │   └── index.ts
+│   │   └── iniciar-transferencia-cliente
+│   │       └── index.ts
+│   └── migrations
+│       ├── 001_create_numero_cuenta_seq_and_function.sql
+│       └── 002_add_tipo_to_perfiles_and_constraints.sql
 ├── tailwind.config.ts
 └── tsconfig.json
 ```
@@ -221,6 +230,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+```
+
+## File: `errores`
+```
 
 ```
 
@@ -418,201 +432,6 @@ _[Skipped: binary or non-UTF8 file]_
 ## File: `public\window.svg`
 ```svg
 <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
-```
-
-## File: `refactor.md`
-```md
-# Plan de Refactorización: Chitibank a Producción
-
-**Versión:** 1.0
-**Fecha:** 07 de septiembre de 2025
-**Autor:** Gemini (Senior Software Engineer)
-
-## 1. Análisis de Viabilidad con Supabase (Plan Gratuito)
-
-Tras analizar el plan gratuito de Supabase, se confirma que es perfectamente viable para este proyecto:
-
-*   **Base de Datos:** Ofrece una base de datos PostgreSQL con hasta 500 MB de almacenamiento, más que suficiente para miles de registros de usuarios y transacciones.
-*   **Autenticación:** Incluye hasta 50,000 usuarios activos mensuales, cubriendo las necesidades de cualquier colegio.
-*   **Edge Functions:** El plan gratuito incluye **2,000,000 de ejecuciones de Edge Functions al mes**, con un tiempo de ejecución de hasta 2 minutos por invocación. Esto es más que suficiente para manejar todas las transacciones y operaciones lógicas del banco sin incurrir en costos.
-
-**Conclusión:** El plan gratuito de Supabase cubre todas las necesidades del proyecto sin limitaciones significativas.
-
-## 2. Diseño de la Base de Datos (Supabase/PostgreSQL)
-
-Se diseñará una estructura de datos normalizada, simple y segura, utilizando la autenticación de Supabase como base.
-
-### 2.1. Roles de Usuario
-
-Se definirán dos roles a nivel de aplicación para la lógica de negocio:
-*   `admin`: Profesores o personal administrativo del colegio.
-*   `cliente`: Estudiantes con una cuenta en el banco.
-
-### 2.2. Esquema de Tablas (SQL)
-
-A continuación, el código SQL para crear las tablas en el editor de Supabase.
-
-```sql
--- 1. PERFILES DE USUARIO
--- Esta tabla extiende la tabla auth.users de Supabase para añadir metadatos.
-CREATE TABLE public.perfiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  nombre_completo TEXT NOT NULL,
-  rol TEXT NOT NULL DEFAULT 'cliente',
-  fecha_creacion TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-  
-  CONSTRAINT rol_valido CHECK (rol IN ('admin', 'cliente'))
-);
-
--- 2. CUENTAS BANCARIAS
--- Cada usuario de tipo 'cliente' tendrá una cuenta asociada.
-CREATE TABLE public.cuentas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  usuario_id UUID UNIQUE NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
-  numero_cuenta TEXT UNIQUE NOT NULL,
-  saldo_actual NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-  fecha_apertura TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-  
-  CONSTRAINT saldo_no_negativo CHECK (saldo_actual >= 0)
-);
-
--- 3. TRANSACCIONES
--- Registra cada movimiento de dinero.
-CREATE TABLE public.transacciones (
-  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  cuenta_origen_id UUID REFERENCES public.cuentas(id),
-  cuenta_destino_id UUID REFERENCES public.cuentas(id),
-  monto NUMERIC(10, 2) NOT NULL,
-  tipo TEXT NOT NULL,
-  descripcion TEXT,
-  fecha TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-
-  CONSTRAINT tipo_transaccion_valido CHECK (tipo IN ('deposito', 'retiro', 'transferencia')),
-  CONSTRAINT monto_positivo CHECK (monto > 0),
-  -- Asegura que al menos una de las cuentas (origen o destino) esté presente.
-  CONSTRAINT origen_o_destino_requerido CHECK (cuenta_origen_id IS NOT NULL OR cuenta_destino_id IS NOT NULL)
-);
-```
-
-## 3. Plan de Backend con Edge Functions
-
-La lógica crítica se ejecutará en el servidor para mayor seguridad y consistencia.
-
-*   **Función `crear-usuario-cliente`**:
-    *   **Disparador:** Llamada desde el frontend por un `admin`.
-    *   **Lógica:**
-        1.  Recibe `nombre_completo`, `email`, `password` y `saldo_inicial`.
-        2.  Crea el usuario en `Supabase Auth`.
-        3.  Inserta un registro en la tabla `perfiles` con el `rol` de 'cliente'.
-        4.  Crea un registro en la tabla `cuentas` asociado al nuevo usuario, con el `saldo_inicial` y un `numero_cuenta` único generado.
-        5.  Si el `saldo_inicial` es mayor que cero, crea una transacción de tipo 'deposito' inicial.
-    *   **Seguridad:** La función debe verificar que quien la invoca es un `admin`.
-
-*   **Función `realizar-transaccion`**:
-    *   **Disparador:** Llamada desde el frontend por un `admin` (depósitos/retiros) o un `cliente` (transferencias).
-    *   **Lógica:**
-        1.  Recibe `tipo_transaccion`, `monto`, `cuenta_origen_id`, `cuenta_destino_id`.
-        2.  **Ejecuta todo dentro de una transacción de base de datos (BEGIN/COMMIT/ROLLBACK).**
-        3.  Verifica que el usuario tenga permisos para la operación (un cliente solo puede transferir desde su propia cuenta).
-        4.  Verifica que la cuenta de origen tenga saldo suficiente.
-        5.  Actualiza los saldos de las tablas `cuentas` (resta del origen, suma al destino).
-        6.  Inserta un nuevo registro en la tabla `transacciones`.
-    *   **Seguridad:** La función validará internamente los permisos del invocador.
-
-## 3. Plan de Backend con Edge Functions - *Acción Requerida*
-
-Se refina la lógica de las funciones para que sean más específicas y seguras.
-
-*   **Función `crear-usuario-cliente`** *(Lógica ya implementada, verificar y desplegar)*
-    *   **Propósito:** Permite a un `admin` crear una nueva cuenta de estudiante.
-    *   **Acción:** No requiere cambios en el código actual. Asegurarse de que utiliza claves de `SERVICE_ROLE_KEY` para tener permisos de administrador.
-
-*   **Función `gestionar-fondos` (Nueva)**
-    *   **Propósito:** Centraliza las operaciones de depósito y retiro realizadas por un `admin`.
-    *   **Disparador:** Llamada desde el frontend por un `admin`.
-    *   **Lógica:**
-        1.  Verificar que el invocador tiene el rol `admin`.
-        2.  Recibe `tipo_operacion` ('deposito' o 'retiro'), `cuenta_id`, `monto`.
-        3.  Valida que el `monto` sea positivo.
-        4.  Para retiros, verifica que la cuenta tenga saldo suficiente.
-        5.  Actualiza el `saldo_actual` en la tabla `cuentas`.
-        6.  Inserta un registro en `transacciones` con el tipo correspondiente.
-
-*   **Función `iniciar-transferencia-cliente` (Nueva)**
-    *   **Propósito:** Provee un endpoint seguro para que los clientes inicien transferencias.
-    *   **Disparador:** Llamada desde el frontend por un `cliente`.
-    *   **Lógica:**
-        1.  La función es un simple *wrapper* de seguridad.
-        2.  Recibe `cuenta_origen_id`, `numero_cuenta_destino`, `monto`.
-        3.  Verifica que el `auth.uid()` del usuario que llama coincide con el `usuario_id` de la `cuenta_origen_id`.
-        4.  Llama a la función de base de datos: `supabase.rpc('realizar_transferencia', { ...params })`.
-        5.  Devuelve el resultado o el error de la función RPC.
-
-## 4. Plan de Refactorización del Frontend (Next.js)
-
-### 4.1. Limpieza de Deuda Técnica
-1.  **Eliminar Contexto:** Borrar el archivo `src/contexts/banco-munay-context.tsx`.
-2.  **Eliminar Utilidades de Storage:** Borrar los archivos `src/lib/csv-storage.ts` y `src/lib/local-storage.ts`.
-3.  **Refactorizar Componentes:** Ir a cada componente que usaba `useBancoMunay` y prepararlo para recibir datos a través de `props` o para hacer sus propias llamadas a Supabase.
-
-### 4.2. Conexión del Panel de Administración
-1.  **`/admin/page.tsx` (Dashboard):**
-    *   Convertir a Server Component (`async function`).
-    *   Usar el `createClient` de `lib/supabase/server` para obtener las estadísticas (conteo de perfiles, suma de saldos) directamente en el servidor.
-2.  **`/admin/lista-alumnos/page.tsx`:**
-    *   Usar el cliente de servidor de Supabase para hacer un `fetch` inicial de los perfiles y sus cuentas asociadas: `supabase.from('perfiles').select('*, cuentas(*))'`.
-    *   La búsqueda y filtrado se pueden manejar en el cliente o con Server Actions para recargar los datos.
-3.  **`/admin/nuevo-alumno/page.tsx`:**
-    *   El `handleSubmit` del formulario debe invocar la Edge Function: `supabase.functions.invoke('crear-usuario-cliente', { body: formData })`.
-4.  **Añadir Depósitos/Retiros:**
-    *   En la `lista-alumnos`, añadir botones en cada fila para "Depositar" y "Retirar".
-    *   Estos botones abrirán un modal que pedirá el monto e invocará la Edge Function `gestionar-fondos`.
-
-### 4.3. Implementación del Portal del Cliente
-1.  **Crear Rutas del Cliente:**
-    *   Crear la estructura `src/app/(cliente)/dashboard` y `src/app/(cliente)/layout.tsx`.
-    *   El layout del cliente debe usar el `ClientGuard` para proteger las rutas.
-2.  **`/dashboard/page.tsx` (Dashboard del Cliente):**
-    *   Será un Server Component (`async`).
-    *   Obtendrá los datos de la cuenta del usuario logueado (`supabase.from('cuentas').select('*').eq('usuario_id', user.id)`).
-    *   Obtendrá las últimas 10 transacciones (`supabase.from('transacciones')...`).
-    *   Pasará estos datos a componentes de cliente para su renderización (Ej: `<BalanceCard saldo={...} />`, `<RecentTransactionsList transactions={...} />`).
-3.  **Página de Transferencias (`/dashboard/transferir`):**
-    *   Crear un formulario de cliente para la transferencia.
-    *   El `handleSubmit` del formulario invocará la Edge Function `iniciar-transferencia-cliente`.
-    *   Manejar la UI para estados de carga, éxito y error (ej. "Saldo insuficiente", "Cuenta no encontrada").
-
-## 5. Hoja de Ruta Sugerida
-
-1.  **Fase 1: Backend y Configuración (1-2 días)**
-    *   [x] Configurar el proyecto en Supabase.
-    *   [x] Ejecutar los scripts SQL para crear las tablas.
-    *   [x] Configurar el cliente de Supabase en el proyecto Next.js y las variables de entorno.
-
-2.  **Fase 2: Autenticación (2-3 días)**
-    *   [x] Refactorizar las páginas de Login y Registro para usar Supabase Auth.
-    *   [ ] Implementar el logout.
-    *   [x] Actualizar los guardianes de rutas (`AdminGuard` y `ClientGuard`).
-
-3.  **Fase 3: Implementación de Edge Functions (3-4 días)**
-    *   [ ] Desarrollar y desplegar la función `crear-usuario-cliente`.
-    *   [ ] Desarrollar y desplegar la función `realizar-transaccion`.
-
-4.  **Fase 4: Refactorización del Panel de Administración (3-5 días)**
-    *   [ ] Conectar la lista de alumnos a Supabase.
-    *   [ ] Conectar el formulario de nuevo alumno a la Edge Function.
-    *   [ ] Conectar las funcionalidades de editar y eliminar.
-    *   [ ] Añadir la funcionalidad de depósito/retiro para administradores.
-
-5.  **Fase 5: Construcción de la Vista del Cliente (4-6 días)**
-    *   [ ] Crear la estructura de rutas y layout para el cliente.
-    *   [ ] Desarrollar el dashboard del cliente (saldo y transacciones recientes).
-    *   [ ] Desarrollar la funcionalidad de transferencia entre estudiantes.
-    *   [ ] Pulir la UI/UX para que sea intuitiva para los niños.
-
-6.  **Fase 6: Pruebas y Despliegue (2-3 días)**
-    *   [ ] Realizar pruebas exhaustivas de todos los flujos (admin y cliente).
-    *   [ ] Desplegar en Vercel y configurar las variables de entorno de producción.
 ```
 
 ## File: `src\app\(cliente)\dashboard\page.tsx`
@@ -906,14 +725,18 @@ export default function TransferPage() {
 
 ## File: `src\app\(cliente)\layout.tsx`
 ```tsx
-import ClientGuard from "@/components/client-guard";
+import { createClient as createServerClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 
-export default function ClienteLayout({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
-    return <ClientGuard>{children}</ClientGuard>;
+export default async function ClienteLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).maybeSingle();
+  if (!perfil || perfil.rol !== 'cliente') redirect('/auth/login');
+
+  return <>{children}</>;
 }
 
 ```
@@ -926,6 +749,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Settings } from "lucide-react";
 
 export default async function ConfiguracionPage() {
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient();
 
     const {
@@ -960,26 +784,28 @@ export default async function ConfiguracionPage() {
 
 ## File: `src\app\admin\layout.tsx`
 ```tsx
+import { createClient as createServerClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { AdminNavigation } from '@/components/admin-navigation';
+
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-import AdminGuard from '@/components/admin-guard';
-import { AdminNavigation } from '@/components/admin-navigation';
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).maybeSingle();
+  if (!perfil || !['personal', 'admin'].includes(perfil.rol)) redirect('/auth/login');
+
   return (
-    <AdminGuard>
-      <div className="min-h-screen bg-gray-50">
-        <AdminNavigation />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </main>
-      </div>
-    </AdminGuard>
+    <div className="min-h-screen bg-gray-50 flex">
+      <AdminNavigation />
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+      </main>
+    </div>
   );
 }
 
@@ -1194,8 +1020,8 @@ async function getAlumnos() {
         id: perfil.id,
         nombre: perfil.nombre_completo,
         fechaCreacion: perfil.fecha_creacion,
-        cuentaId: perfil.cuentas[0]?.id ?? '',
-        saldo: perfil.cuentas[0]?.saldo_actual ?? 0,
+        cuentaId: perfil.cuentas?.[0]?.id ?? '',
+        saldo: Number(perfil.cuentas?.[0]?.saldo_actual) || 0,
     }));
 }
 
@@ -1223,8 +1049,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// CORRECCIÓN: Se añade la importación que faltaba del cliente de Supabase para el navegador.
-import { createClient } from '@/lib/supabase/client';
+// ...existing imports...
 import { UserPlus, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -1235,6 +1060,7 @@ export default function NuevoAlumnoPage() {
     email: '',
     password: '',
     montoInicial: '0',
+    rol: 'alumno',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -1254,8 +1080,8 @@ export default function NuevoAlumnoPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target as HTMLInputElement | HTMLSelectElement;
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -1274,17 +1100,24 @@ export default function NuevoAlumnoPage() {
     if (!validateForm()) return;
     setIsSubmitting(true);
     setErrors({});
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.functions.invoke('crear-usuario-cliente', {
-        body: {
+      try {
+      // Llamamos al endpoint server-side que valida admin y reenvía a la Edge Function
+      const resp = await fetch('/api/admin/crear-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           nombre_completo: formData.nombre.trim(),
           email: formData.email.trim(),
           password: formData.password,
           saldo_inicial: parseFloat(formData.montoInicial),
-        },
+          // Mapear: si es 'personal' entonces rol='personal' (no cliente),
+          // en caso contrario el rol de auth será 'cliente' y usamos 'tipo' para diferenciar
+          rol: formData.rol === 'personal' ? 'personal' : 'cliente',
+          tipo: formData.rol || 'alumno'
+        })
       });
-      if (error) throw new Error(data?.error || error.message);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || 'Error creating user');
       setShowSuccess(true);
       setTimeout(() => router.push('/admin/lista-alumnos'), 2000);
     } catch (err) {
@@ -1363,6 +1196,15 @@ export default function NuevoAlumnoPage() {
               {errors.montoInicial && <p className="text-sm text-red-600">{errors.montoInicial}</p>}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="rol">Rol</Label>
+              <select id="rol" name="rol" value={formData.rol} onChange={handleInputChange} className="w-full border rounded p-2">
+                <option value="alumno">Alumno</option>
+                <option value="padre">Padre de Familia</option>
+                <option value="personal">Personal de la IE</option>
+              </select>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="ghost" asChild><Link href="/admin/lista-alumnos">Cancelar</Link></Button>
               <Button type="submit" disabled={isSubmitting}>
@@ -1410,7 +1252,7 @@ async function getStats() {
     const { data: accounts, error: balanceError } = await supabase.from('cuentas').select('saldo_actual');
     if (balanceError) console.error("Error fetching balances:", balanceError);
     
-    const totalBalance = accounts?.reduce((acc, curr) => acc + (curr.saldo_actual ?? 0), 0) ?? 0;
+  const totalBalance = accounts?.reduce((acc, curr) => acc + (Number(curr.saldo_actual) || 0), 0) ?? 0;
     
     return {
         totalStudents: count ?? 0,
@@ -1435,12 +1277,12 @@ async function getRecentStudents() {
     
     const typedData = data as ProfileWithAccount[];
 
-    return typedData.map(profile => ({
-        id: profile.id,
-        nombre: profile.nombre_completo,
-        fechaCreacion: profile.fecha_creacion,
-        saldo: profile.cuentas[0]?.saldo_actual ?? 0,
-    }));
+  return typedData.map(profile => ({
+    id: profile.id,
+    nombre: profile.nombre_completo,
+    fechaCreacion: profile.fecha_creacion,
+    saldo: Number(profile.cuentas?.[0]?.saldo_actual) || 0,
+  }));
 }
 
 export default async function AdminDashboard() {
@@ -1535,6 +1377,55 @@ export default async function AdminDashboard() {
     </div>
   );
 }
+```
+
+## File: `src\app\api\admin\crear-usuario\route.ts`
+```ts
+import { NextResponse } from 'next/server'
+import { createClient as createServerSupabaseClient } from '@/lib/supabase/server'
+
+export async function POST(req: Request) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    // Validar que el caller está autenticado y tiene rol admin/personal
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).maybeSingle();
+    if (!perfil || !['personal', 'admin'].includes(perfil.rol)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    type CreateUserBody = {
+      nombre_completo: string;
+      email: string;
+      password: string;
+      saldo_inicial?: number;
+      rol?: string;
+      tipo?: string;
+    };
+
+    const body = (await req.json()) as CreateUserBody;
+    const adminSecret = process.env.ADMIN_CREATE_SECRET || '';
+
+    // Call Edge Function with service secret header
+    const edgeUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '') + '/functions/v1/crear-usuario-cliente';
+    const resp = await fetch(edgeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-secret': adminSecret
+      },
+      body: JSON.stringify(body)
+    });
+    const json = await resp.json();
+    return NextResponse.json(json, { status: resp.status });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 ```
 
 ## File: `src\app\api\drive-scrape\route.ts`
@@ -1681,6 +1572,7 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (token_hash && type) {
+    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient()
 
     const { error } = await supabase.auth.verifyOtp({
@@ -1696,7 +1588,6 @@ export async function GET(request: NextRequest) {
   // redirect the user to an error page with some instructions
   return NextResponse.redirect(new URL('/auth/auth-code-error', request.url))
 }
-
 ```
 
 ## File: `src\app\auth\login\page.tsx`
@@ -1901,34 +1792,38 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
+      // Llamamos a la Edge Function pública que crea Auth + perfil + cuenta con saldo 0
+      const res = await supabase.functions.invoke('crear-usuario-cliente', {
+        body: { nombre_completo: formData.fullName, email: formData.email, password: formData.password, saldo_inicial: 0, rol: 'cliente', tipo: 'alumno' }
+      });
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    });
+      // The SDK returns a Response-like object; attempt to parse json safely
+      let json: unknown;
+      try {
+        // Some runtimes return a raw object, others a Response-like object
+  const maybe = res as unknown;
+  const maybeJsonFn = typeof (maybe as { json?: unknown }).json === 'function' ? (maybe as { json: () => Promise<unknown> }).json : undefined;
+  json = typeof maybeJsonFn === 'function' ? await maybeJsonFn.call(res) : res;
+      } catch {
+        json = res;
+      }
 
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
+      const isErrorLike = (obj: unknown): obj is { error?: unknown } => {
+        return !!obj && typeof obj === 'object' && 'error' in (obj as Record<string, unknown>);
+      };
 
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('perfiles')
-        .insert({ 
-            id: data.user.id, 
-            nombre_completo: formData.fullName, 
-            rol: 'cliente'
-        });
-
-      if (profileError) {
-        setError(`Error al crear el perfil: ${profileError.message}`);
+      if (isErrorLike(json) && json.error) {
+        setError(String(json.error) || 'Error al registrar usuario.');
       } else {
         setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
         setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
       }
+    } catch (err) {
+      const unknownErr = err as unknown;
+      const message = unknownErr instanceof Error ? unknownErr.message : String(unknownErr);
+      setError(message || 'Error al registrar usuario.');
     }
     setLoading(false);
   };
@@ -2633,7 +2528,7 @@ export function AdminNavigation() {
     ];
 
     return (
-        <aside className="w-64" aria-label="Sidebar">
+        <aside className="w-64 flex-shrink-0" aria-label="Sidebar">
             <div className="px-3 py-4 overflow-y-auto rounded bg-gray-800 h-full flex flex-col min-h-screen">
                 <Link
                     href="/admin"
@@ -3358,12 +3253,10 @@ BEGIN
     UPDATE public.cuentas SET saldo_actual = saldo_actual - monto_param WHERE id = cuenta_origen_id_param;
     UPDATE public.cuentas SET saldo_actual = saldo_actual + monto_param WHERE id = cuenta_destino_id_var;
     
-    -- Registrar ambas transacciones para el historial de cada usuario
+    -- CORRECCIÓN: Se registra una única transacción con el tipo 'transferencia' para cumplir la regla de la tabla.
+    -- La descripción ahora es más clara y se evita duplicar registros.
     INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
-    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_enviada', 'Envío a ' || nombre_destino_var);
-
-    INSERT INTO public.transacciones(cuenta_origen_id, cuenta_destino_id, monto, tipo, descripcion)
-    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia_recibida', 'Recibido de ' || (SELECT p.nombre_completo FROM cuentas c JOIN perfiles p ON c.usuario_id = p.id WHERE c.id = cuenta_origen_id_param));
+    VALUES (cuenta_origen_id_param, cuenta_destino_id_var, monto_param, 'transferencia', 'Transferencia de ' || nombre_origen_var || ' a ' || nombre_destino_var);
 
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -3805,16 +3698,29 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
+};
 
+```
+
+## File: `supabase\functions\crear-usuario-cliente\_shared\cors.ts`
+```ts
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
+};
 ```
 
 ## File: `supabase\functions\crear-usuario-cliente\index.ts`
 ```ts
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+import { corsHeaders } from './_shared/cors.ts';
 
 // Función para generar un número de cuenta único de 10 dígitos
 function generarNumeroCuenta() {
@@ -3823,7 +3729,7 @@ function generarNumeroCuenta() {
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -3832,7 +3738,51 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { nombre_completo, email, password, saldo_inicial } = await req.json();
+    const body = await req.json();
+  let { nombre_completo, email, password, saldo_inicial, rol, tipo } = body as any;
+
+    // Seguridad: determinar si el caller es admin.
+    // 1) Si se proporciona x-admin-secret y coincide con ADMIN_CREATE_SECRET, es admin.
+    const providedAdminSecret = req.headers.get('x-admin-secret') || '';
+    const adminSecret = Deno.env.get('ADMIN_CREATE_SECRET') || '';
+    let isAdminCall = adminSecret && providedAdminSecret && providedAdminSecret === adminSecret;
+
+    // 2) Si se proporcionó Authorization Bearer <token>, validar token consultando /auth/v1/user
+    // y comprobar en la tabla `perfiles` que el rol del usuario es admin/personal.
+    if (!isAdminCall) {
+      const authHeader = req.headers.get('authorization') || '';
+      if (authHeader.toLowerCase().startsWith('bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const authUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '') + '/auth/v1/user';
+          const userResp = await fetch(authUrl, { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } });
+          if (userResp.ok) {
+            const userJson = await userResp.json();
+            const userId = userJson?.id;
+            if (userId) {
+              // verificar rol en perfiles
+              const { data: perfilData, error: perfilErr } = await supabaseAdmin.from('perfiles').select('rol').eq('id', userId).maybeSingle();
+              if (!perfilErr && perfilData && ['personal', 'admin'].includes(perfilData.rol)) {
+                isAdminCall = true;
+              }
+            }
+          }
+        } catch (e) {
+          // ignore and treat as non-admin
+        }
+      }
+    }
+
+    // Si no es llamada admin, forzamos saldo a 0 y rol a 'cliente'
+    if (!isAdminCall) {
+      saldo_inicial = 0;
+      rol = 'cliente';
+      tipo = 'alumno';
+    }
+
+    // Normalizar campos
+    saldo_inicial = typeof saldo_inicial === 'number' ? saldo_inicial : parseFloat(saldo_inicial || '0') || 0;
+    rol = rol || 'cliente';
 
     // 1. Crear usuario en Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -3845,20 +3795,41 @@ serve(async (req: Request) => {
     const user = authData.user;
     if (!user) throw new Error("La creación del usuario en Auth falló.");
 
-    // 2. Crear perfil
+    // 2. Crear perfil (usar rol y tipo decididos)
+    const perfilInsert: any = { id: user.id, nombre_completo: nombre_completo, rol: rol };
+    if (tipo) perfilInsert.tipo = tipo;
+    else perfilInsert.tipo = 'alumno';
+
     const { error: perfilError } = await supabaseAdmin
       .from('perfiles')
-      .insert({ id: user.id, nombre_completo: nombre_completo, rol: 'cliente' });
+      .insert(perfilInsert);
     if (perfilError) throw perfilError;
 
-    // 3. Crear cuenta bancaria
-    const numero_cuenta = generarNumeroCuenta();
-    const { data: cuentaData, error: cuentaError } = await supabaseAdmin
-      .from('cuentas')
-      .insert({ usuario_id: user.id, saldo_actual: saldo_inicial, numero_cuenta: numero_cuenta })
-      .select('id')
-      .single();
-    if (cuentaError || !cuentaData) throw cuentaError || new Error("Fallo al crear la cuenta bancaria.");
+    // 3. Crear cuenta bancaria: preferir la función SQL atómica `create_account_for_user`
+    let cuentaData: any = null;
+    try {
+      const rpcResp = await supabaseAdmin.rpc('create_account_for_user', { p_usuario_id: user.id, p_saldo: saldo_inicial });
+      if (rpcResp.error) throw rpcResp.error;
+      cuentaData = rpcResp.data;
+    } catch (rpcErr) {
+      // Si la función RPC no existe o falla, hacemos fallback a inserción con reintentos
+      let cuentaError: any = null;
+      const maxAttempts = 5;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const numero_cuenta = generarNumeroCuenta();
+        const resp = await supabaseAdmin
+          .from('cuentas')
+          .insert({ usuario_id: user.id, saldo_actual: saldo_inicial, numero_cuenta: numero_cuenta })
+          .select('id')
+          .single();
+        cuentaData = resp.data;
+        cuentaError = resp.error;
+        if (!cuentaError && cuentaData) break;
+        if (cuentaError && attempt === maxAttempts - 1) {
+          throw cuentaError;
+        }
+      }
+    }
 
     // 4. Registrar depósito inicial si es mayor a cero
     if (saldo_inicial > 0) {
@@ -3891,12 +3862,13 @@ serve(async (req: Request) => {
 ```ts
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -3964,12 +3936,13 @@ serve(async (req: Request) => {
 ```ts
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -4011,6 +3984,233 @@ serve(async (req: Request) => {
     });
   }
 });
+```
+
+## File: `supabase\migrations\001_create_numero_cuenta_seq_and_function.sql`
+```sql
+-- Migration: create sequence and create_account_for_user function
+-- Creates a sequence for numero_cuenta and a helper RPC to create accounts atomically
+
+-- 1) create sequence if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'S' AND relname = 'numero_cuenta_seq') THEN
+    CREATE SEQUENCE public.numero_cuenta_seq START 1000000000;
+  END IF;
+END$$;
+
+-- 2) ensure sequence start is beyond any existing numero_cuenta values (if any)
+DO $$
+DECLARE
+  max_num bigint;
+BEGIN
+  BEGIN
+    SELECT MAX(CASE WHEN trim(numero_cuenta) ~ '^\d+$' THEN numero_cuenta::bigint ELSE NULL END) INTO max_num FROM public.cuentas;
+  EXCEPTION WHEN undefined_table THEN
+    max_num := NULL;
+  END;
+  IF max_num IS NOT NULL THEN
+    PERFORM setval('public.numero_cuenta_seq', GREATEST(nextval('public.numero_cuenta_seq'), max_num + 1), false);
+  END IF;
+END$$;
+
+-- 3) helper to generate numero_cuenta as zero-padded 10 digits
+CREATE OR REPLACE FUNCTION public.generate_numero_cuenta()
+RETURNS text LANGUAGE sql AS $$
+  SELECT lpad(nextval('public.numero_cuenta_seq')::text, 10, '0');
+$$;
+
+-- 4) atomic creation function for cuentas
+CREATE OR REPLACE FUNCTION public.create_account_for_user(p_usuario_id uuid, p_saldo numeric)
+RETURNS public.cuentas AS $$
+DECLARE
+  v_num text;
+  v_row public.cuentas%ROWTYPE;
+BEGIN
+  v_num := lpad(nextval('public.numero_cuenta_seq')::text, 10, '0');
+  INSERT INTO public.cuentas (usuario_id, numero_cuenta, saldo_actual)
+  VALUES (p_usuario_id, v_num, coalesce(p_saldo, 0))
+  RETURNING * INTO v_row;
+  RETURN v_row;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Note: Run this migration in your Supabase (psql) or include in your migration tooling.
+
+```
+
+## File: `supabase\migrations\002_add_tipo_to_perfiles_and_constraints.sql`
+```sql
+-- Migration: add 'tipo' column to perfiles and update role/tipo constraints
+-- Adds a 'tipo' column to distinguish client types (alumno, padre, personal)
+
+ALTER TABLE IF EXISTS public.perfiles
+  ADD COLUMN IF NOT EXISTS tipo text NOT NULL DEFAULT 'alumno';
+
+-- Ensure the rol constraint includes system roles: cliente, personal, admin
+ALTER TABLE IF EXISTS public.perfiles
+  DROP CONSTRAINT IF EXISTS rol_valido;
+ALTER TABLE IF EXISTS public.perfiles
+  ADD CONSTRAINT rol_valido CHECK (rol IN ('cliente', 'personal', 'admin'));
+
+-- Add a constraint for tipo values used by the UI: alumno, padre, personal
+ALTER TABLE IF EXISTS public.perfiles
+  DROP CONSTRAINT IF EXISTS tipo_valido;
+ALTER TABLE IF EXISTS public.perfiles
+  ADD CONSTRAINT tipo_valido CHECK (tipo IN ('alumno', 'padre', 'personal'));
+
+-- Backfill existing rows: if tipo is NULL or empty set to 'alumno'
+UPDATE public.perfiles SET tipo = 'alumno' WHERE tipo IS NULL OR tipo = '';
+
+```
+
+## File: `SUPABASE_DATABASE.md`
+```md
+# Documentación de la Base de Datos Supabase (proyecto: banco_ie)
+
+Fecha: 13/09/2025
+
+Resumen
+-------
+Este documento describe el esquema de la base de datos `public` del proyecto Supabase `banco_ie`, las tablas principales, columnas, restricciones, índices, funciones (RPC), y cómo la aplicación realiza la autenticación y usa las keys (anon/service-role) en las edge functions.
+
+Contenido
+- Resumen del esquema
+- Tablas: `perfiles`, `cuentas`, `transacciones` (columnas, tipos, defaults)
+- Constraints: PK, FKs, UNIQUE, CHECK
+- Índices
+- Funciones/RPC en la base de datos: `realizar_transferencia` (y otras detectadas)
+- Edge Functions en `supabase/functions`
+- Autenticación y configuración (según `supabase/config.toml` y uso en el código)
+- Recomendaciones de seguridad y mejoras
+
+Esquema público
+---------------
+Tablas detectadas en `public`:
+- perfiles
+- cuentas
+- transacciones
+
+1) Tabla `cuentas`
+- Columnas
+  - `id` : uuid, NOT NULL, DEFAULT `gen_random_uuid()` (PK)
+  - `usuario_id` : uuid, NOT NULL, FK -> `perfiles(id)`, UNIQUE
+  - `numero_cuenta` : text, NOT NULL, UNIQUE
+  - `saldo_actual` : numeric, NOT NULL, DEFAULT `0.00`
+  - `fecha_apertura` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
+
+- Constraints notables
+  - `cuentas_pkey` (PRIMARY KEY on `id`)
+  - `cuentas_usuario_id_fkey` (FOREIGN KEY `usuario_id` -> `perfiles(id)`)
+  - `cuentas_usuario_id_key` (UNIQUE on `usuario_id`)
+  - `cuentas_numero_cuenta_key` (UNIQUE on `numero_cuenta`)
+  - `saldo_no_negativo` (CHECK constraint enforcing saldo no negativo)
+  - Varios NOT NULL check constraints generados automáticamente por Postgres for NOT NULL columns
+
+- Índices
+  - `cuentas_pkey` (b-tree on `id`)
+  - `cuentas_usuario_id_key` (unique b-tree on `usuario_id`)
+  - `cuentas_numero_cuenta_key` (unique b-tree on `numero_cuenta`)
+
+2) Tabla `perfiles`
+- Columnas
+  - `id` : uuid, NOT NULL (PK)
+  - `nombre_completo` : text, NOT NULL
+  - `rol` : text, NOT NULL, DEFAULT `'cliente'`::text
+  - `fecha_creacion` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
+
+- Constraints
+  - `perfiles_pkey` (PRIMARY KEY on `id`)
+  - `perfiles_id_fkey` (FOREIGN KEY `id` -> `users(id)`?) - NOTE: There is an FK referencing `users` inferred in the typed file. In the DB inspection, `perfiles_id_fkey` exists but referenced table may be part of `auth` schema; the typed db file shows relation to `users(id)` (auth.users)
+  - `rol_valido` (CHECK constraint to validate `rol` values)
+
+- Índices
+  - `perfiles_pkey` (b-tree on `id`)
+
+3) Tabla `transacciones`
+- Columnas
+  - `id` : bigint, NOT NULL (PK)
+  - `cuenta_origen_id` : uuid, NULLABLE, FK -> `cuentas(id)`
+  - `cuenta_destino_id` : uuid, NULLABLE, FK -> `cuentas(id)`
+  - `monto` : numeric, NOT NULL
+  - `tipo` : text, NOT NULL (ej: 'deposito', 'retiro', 'transferencia')
+  - `descripcion` : text, NULLABLE
+  - `fecha` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
+
+- Constraints
+  - `transacciones_pkey` (PRIMARY KEY on `id`)
+  - `transacciones_cuenta_origen_id_fkey` (FOREIGN KEY -> `cuentas(id)`)
+  - `transacciones_cuenta_destino_id_fkey` (FOREIGN KEY -> `cuentas(id)`)
+  - `monto_positivo` (CHECK enforcing monto > 0)
+  - `origen_o_destino_requerido` (CHECK ensuring origen o destino presente)
+  - `tipo_transaccion_valido` (CHECK enforcing valid `tipo` values)
+
+- Índices
+  - `transacciones_pkey` (b-tree on `id`)
+
+Funciones/RPC en la base de datos
+---------------------------------
+Se detectaron rutinas en el esquema `public`:
+
+1) `realizar_transferencia(cuenta_origen_id_param uuid, numero_cuenta_destino_param text, monto_param numeric) RETURNS void`
+- Comportamiento (resumen):
+  - Verifica que quien ejecuta tiene permiso (usa `auth.uid()` para validar propietario de `cuenta_origen_id_param`).
+  - Busca la `cuenta_destino` por `numero_cuenta_destino_param` con `FOR UPDATE`.
+  - Verifica que la cuenta destino existe y que no es la misma que la origen.
+  - Verifica saldo suficiente en la cuenta origen.
+  - Actualiza `saldo_actual` restando y sumando en origen/destino (bloqueando filas para concurrencia).
+  - Inserta una fila en `transacciones` con tipo `'transferencia'` y una descripción automatizada.
+  - Lanza excepción con mensajes claros en caso de error (cuenta inexistente, saldo insuficiente, permiso denegado).
+
+2) `realizar_movimiento(...) RETURNS boolean` (se detectó otra función con nombre `realizar_movimiento`, que maneja retiros/depositos/transferencias) -- definición parcial detectada.
+- Nota: `realizar_movimiento` parece ser una versión anterior o auxiliar. Documentar con precaución y revisar código si se usa.
+
+Edge Functions (carpeta `supabase/functions`)
+----------------------------------------------
+En el repo existe una carpeta `supabase/functions` con las siguientes funciones:
+- `crear-usuario-cliente/index.ts` (Edge Function Deno)
+  - Usa `SUPABASE_SERVICE_ROLE_KEY` y `SUPABASE_URL` para crear usuarios vía `supabaseAdmin.auth.admin.createUser`, inserta en `perfiles`, crea `cuentas` y registra `transacciones` si `saldo_inicial > 0`.
+  - Genera `numero_cuenta` aleatorio de 10 dígitos.
+  - CORS habilitado con cabeceras en `_shared/cors.ts`.
+
+- `gestionar-fondos/index.ts`
+  - Usa `SUPABASE_SERVICE_ROLE_KEY` para modificar saldos (depósito/retiro) y registrar transacciones.
+  - Nota: TODO en código para verificar que quien llama es admin.
+
+- `iniciar-transferencia-cliente/index.ts`
+  - Usa `SUPABASE_ANON_KEY` junto con el header Authorization del request para autenticar al usuario (usa `supabase.auth.getUser()`)
+  - Encuentra la cuenta del usuario (por `usuario_id`) y llama al RPC `realizar_transferencia` con `rpc`.
+
+Autenticación y configuración
+-----------------------------
+- `supabase/config.toml` indica `auth.enabled = true` y configuración local (jwt_expiry, enable_signup = true, etc.).
+- El código del frontend/server crea clientes Supabase:
+  - `src/lib/supabase/client.ts` usa `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` para el cliente de navegador.
+  - `src/lib/supabase/server.ts` usa también `NEXT_PUBLIC_SUPABASE_ANON_KEY` y maneja cookies para sesiones en Server Components.
+- Edge Functions:
+  - `crear-usuario-cliente` y `gestionar-fondos` usan `SUPABASE_SERVICE_ROLE_KEY` (privilegiada) para operaciones administrativas.
+  - `iniciar-transferencia-cliente` usa `SUPABASE_ANON_KEY` pero reenvía la cabecera `Authorization` para que `supabase.auth.getUser()` resuelva el usuario autenticado.
+
+RLS (Row Level Security) y políticas
+-----------------------------------
+- NO HAY RLS, SERÁ IMPLEMENTADO A FUTURO.
+
+Archivos relevantes en el repo
+------------------------------
+- `src/lib/supabase/database.types.ts` — tipado generado que refleja las tablas `cuentas`, `perfiles`, `transacciones` y la función `realizar_transferencia`.
+- `src/lib/supabase/client.ts` — creación de cliente browser.
+- `src/lib/supabase/server.ts` — creación de cliente server con cookies.
+- `supabase/config.toml` — configuración local de supabase (auth, api, ports, etc.).
+- `supabase/functions/*` — Edge Functions: `crear-usuario-cliente`, `gestionar-fondos`, `iniciar-transferencia-cliente`.
+
+Apéndice: Resultados SQL crudos
+------------------------------
+- Listado de tablas: `perfiles`, `transacciones`, `cuentas`.
+- Columnas por tabla: (ver sección "Esquema público"), extraído de information_schema.
+- Constraints: PKs, FKs, UNIQUEs y CHECKs detectados; ver secciones anteriores.
+- Routines detectadas: `realizar_movimiento`, `realizar_transferencia` (definiciones detectadas y resumidas).
+
+
 ```
 
 ## File: `tailwind.config.ts`
