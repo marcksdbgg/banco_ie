@@ -27,9 +27,11 @@ type AlumnosClientProps = {
 };
 
 export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
-    const [alumnos, setAlumnos] = useState(initialAlumnos);
+    // normalize incoming data: ensure saldo is a number and tipo exists
+    const normalize = (a: Alumno) => ({ ...a, saldo: Number(a.saldo) || 0, tipo: a.tipo ?? 'alumno' });
+    const [alumnos, setAlumnos] = useState<Alumno[]>(() => initialAlumnos.map(normalize));
     useEffect(() => {
-        setAlumnos(initialAlumnos);
+        setAlumnos(initialAlumnos.map(normalize));
     }, [initialAlumnos]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAlumno, setSelectedAlumno] = useState<Alumno | null>(null);
@@ -108,7 +110,8 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     );
 
     const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
-        setSelectedAlumno(alumno);
+        const normalized = normalize(alumno);
+        setSelectedAlumno(normalized);
         if (type === 'edit') setEditForm({ nombre: alumno.nombre });
         if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
         setError('');
