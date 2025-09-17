@@ -28,9 +28,11 @@ async function getClientes() {
         return [];
     }
 
-    const typedData = data as ClienteConCuenta[];
+        // defensively handle null/undefined data
+        const typedData = (data ?? []) as ClienteConCuenta[];
 
-    return typedData.map(perfil => {
+        try {
+            return typedData.map(perfil => {
         const cuentasArr = perfil.cuentas ?? [];
         const cuentaVal = cuentasArr.find(c => c && c.id) ?? null;
         return {
@@ -41,14 +43,25 @@ async function getClientes() {
             cuentaId: cuentaVal?.id ?? '',
             saldo: Number(cuentaVal?.saldo_actual) || 0,
         };
-    });
+            });
+        } catch (mapError) {
+            console.error('Error mapping clients data:', mapError, { rawData: data });
+            return [];
+        }
 }
 
 export default async function ListaAlumnosPage() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+        try {
+            const supabase = await createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) redirect('/auth/login');
 
-    const clientes = await getClientes();
-    return <AlumnosClient initialAlumnos={clientes} />;
+            const clientes = await getClientes();
+            return <AlumnosClient initialAlumnos={clientes} />;
+        } catch (pageError) {
+            // Log full error on server for debugging (will appear in logs)
+            console.error('ListaAlumnosPage render error:', pageError);
+            // Rethrow so Next can render error page, but we logged details.
+            throw pageError;
+        }
 }
