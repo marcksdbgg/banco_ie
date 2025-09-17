@@ -81,6 +81,8 @@ banco_ie/
 │   ├── functions
 │   │   ├── _shared
 │   │   │   └── cors.ts
+│   │   ├── borrar-usuario-cliente
+│   │   │   └── index.ts
 │   │   ├── crear-usuario-cliente
 │   │   │   └── index.ts
 │   │   ├── gestionar-fondos
@@ -941,6 +943,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
 ## File: `src/app/admin/lista-alumnos/page-client.tsx`
 ```tsx
+// src/app/admin/lista-alumnos/page-client.tsx
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -954,15 +958,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { formatSoles } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Search, DollarSign, Edit, Trash2, AlertTriangle, PlusCircle, MinusCircle, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type Alumno = {
     id: string;
     nombre: string;
+    tipo: string;
     fechaCreacion: string;
     cuentaId: string;
     saldo: number;
-    tipo?: string;
 };
 
 type AlumnosClientProps = {
@@ -970,12 +974,7 @@ type AlumnosClientProps = {
 };
 
 export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
-    // normalize incoming data: ensure saldo is a number and tipo exists
-    const normalize = (a: Alumno) => ({ ...a, saldo: Number(a.saldo) || 0, tipo: a.tipo ?? 'alumno' });
-    const [alumnos, setAlumnos] = useState<Alumno[]>(() => initialAlumnos.map(normalize));
-    useEffect(() => {
-        setAlumnos(initialAlumnos.map(normalize));
-    }, [initialAlumnos]);
+    const [alumnos, setAlumnos] = useState(initialAlumnos);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAlumno, setSelectedAlumno] = useState<Alumno | null>(null);
     const [modal, setModal] = useState<'edit' | 'delete' | 'transaction' | null>(null);
@@ -985,16 +984,22 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     const [error, setError] = useState('');
     const router = useRouter();
 
+    useEffect(() => {
+        setAlumnos(initialAlumnos);
+    }, [initialAlumnos]);
+
     const handleUpdate = async () => {
         if (!selectedAlumno || !editForm.nombre.trim()) return;
         setIsSubmitting(true);
+        setError('');
         const supabase = createClient();
         const { error } = await supabase.from('perfiles').update({ nombre_completo: editForm.nombre.trim() }).eq('id', selectedAlumno.id);
-        if (!error) {
-            router.refresh();
-            setModal(null);
-        } else {
+        
+        if (error) {
             setError(error.message);
+        } else {
+            setModal(null);
+            router.refresh();
         }
         setIsSubmitting(false);
     };
@@ -1002,50 +1007,50 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     const confirmDelete = async () => {
         if (!selectedAlumno) return;
         setIsSubmitting(true);
-        const supabase = createClient();
-        const { error } = await supabase.functions.invoke('borrar-usuario-cliente', { body: { userId: selectedAlumno.id } });
-        if (!error) {
-            router.refresh();
+        setError('');
+        try {
+            const supabase = createClient();
+            const { error: invokeError } = await supabase.functions.invoke('borrar-usuario-cliente', {
+                body: { userId: selectedAlumno.id },
+            });
+            if (invokeError) throw invokeError;
+            
             setModal(null);
-        } else {
-            setError(error.message);
+            router.refresh();
+        } catch (err) {
+            const error = err as Error;
+            setError(error.message || 'Ocurrió un error al eliminar.');
+        } finally {
+            setIsSubmitting(false);
         }
-        setIsSubmitting(false);
     };
 
     const confirmTransaction = async () => {
         if (!selectedAlumno || !transactionForm.monto) return;
         const monto = parseFloat(transactionForm.monto);
         if (isNaN(monto) || monto <= 0) {
-            setError("Monto inválido."); return;
+            setError("Monto inválido.");
+            return;
         }
         setIsSubmitting(true);
-        const supabase = createClient();
-        interface InvokeResultWithData { error?: { message: string }; data?: { nuevoSaldo?: number } }
-        interface InvokeResultDirect { message?: string; nuevoSaldo?: number }
-        const invokeRespRaw = await supabase.functions.invoke('gestionar-fondos', {
-            body: { tipo: transactionForm.tipo, cuenta_id: selectedAlumno.cuentaId, monto },
-        });
-        const invokeResp = invokeRespRaw as InvokeResultWithData | InvokeResultDirect;
-        const error = (invokeResp as InvokeResultWithData).error;
-        const data = (invokeResp as InvokeResultWithData).data ?? (invokeResp as InvokeResultDirect);
-        if (!error) {
-            // If the function returns the new balance, update local state for immediate UI feedback
-            function hasNuevoSaldo(obj: unknown): obj is { nuevoSaldo?: number } {
-                return typeof obj === 'object' && obj !== null && 'nuevoSaldo' in obj;
-            }
-            const nuevoSaldo = hasNuevoSaldo(data) ? data.nuevoSaldo : undefined;
-            if (nuevoSaldo !== null && nuevoSaldo !== undefined) {
-                setAlumnos(prev => prev.map(a => a.id === selectedAlumno.id ? { ...a, saldo: Number(nuevoSaldo) } : a));
-            } else {
-                // fallback: refresh server data
-                try { router.refresh(); } catch {};
-            }
+        setError('');
+        try {
+            const supabase = createClient();
+            const { data, error: invokeError } = await supabase.functions.invoke('gestionar-fondos', {
+                body: { tipo: transactionForm.tipo, cuenta_id: selectedAlumno.cuentaId, monto },
+            });
+
+            if (invokeError) throw invokeError;
+            if (data?.error) throw new Error(data.error);
+            
             setModal(null);
-        } else {
-            setError(error.message);
+            router.refresh();
+        } catch (err) {
+            const error = err as Error;
+            setError(error.message || 'Error en la transacción');
+        } finally {
+            setIsSubmitting(false);
         }
-        setIsSubmitting(false);
     };
 
     const filteredAlumnos = alumnos.filter(alumno =>
@@ -1053,8 +1058,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     );
 
     const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
-        const normalized = normalize(alumno);
-        setSelectedAlumno(normalized);
+        setSelectedAlumno(alumno);
         if (type === 'edit') setEditForm({ nombre: alumno.nombre });
         if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
         setError('');
@@ -1093,7 +1097,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
                             {filteredAlumnos.map((alumno) => (
                                 <TableRow key={alumno.id}>
                                     <TableCell className="font-medium">{alumno.nombre}</TableCell>
-                                    <TableCell className="capitalize">{alumno.tipo ?? 'alumno'}</TableCell>
+                                    <TableCell className="capitalize">{alumno.tipo}</TableCell>
                                     <TableCell>{formatSoles(alumno.saldo)}</TableCell>
                                     <TableCell>{new Date(alumno.fechaCreacion).toLocaleDateString('es-PE')}</TableCell>
                                     <TableCell className="text-right space-x-2">
@@ -1110,24 +1114,37 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
             <Dialog open={!!modal} onOpenChange={(isOpen) => !isOpen && setModal(null)}>
                 <DialogContent>
                     {modal === 'edit' && <>
-                        <DialogHeader><DialogTitle>Editar Alumno</DialogTitle></DialogHeader>
-                        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-                        <Label htmlFor="edit-nombre">Nombre</Label>
-                        <Input id="edit-nombre" value={editForm.nombre} onChange={(e) => setEditForm({ nombre: e.target.value })} />
-                        <DialogFooter><Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button><Button onClick={handleUpdate} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button></DialogFooter>
+                        <DialogHeader><DialogTitle>Editar Cliente</DialogTitle></DialogHeader>
+                        {error && <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+                        <div className="space-y-2 py-4">
+                            <Label htmlFor="edit-nombre">Nombre completo</Label>
+                            <Input id="edit-nombre" value={editForm.nombre} onChange={(e) => setEditForm({ nombre: e.target.value })} />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button>
+                            <Button onClick={handleUpdate} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button>
+                        </DialogFooter>
                     </>}
                     {modal === 'delete' && <>
                         <DialogHeader><DialogTitle className="flex items-center"><AlertTriangle className="text-red-500 mr-2" />Confirmar Eliminación</DialogTitle></DialogHeader>
-                        <DialogDescription>¿Seguro que deseas eliminar a <strong>{selectedAlumno?.nombre}</strong>? Esta acción no se puede deshacer.</DialogDescription>
-                        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-                        <DialogFooter><Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button><Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Eliminar</Button></DialogFooter>
+                        <DialogDescription className="py-4">¿Seguro que deseas eliminar a <strong>{selectedAlumno?.nombre}</strong>? Esta acción es irreversible y eliminará su cuenta y transacciones.</DialogDescription>
+                        {error && <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button>
+                            <Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Eliminar</Button>
+                        </DialogFooter>
                     </>}
                     {modal === 'transaction' && <>
                         <DialogHeader><DialogTitle>Operación para {selectedAlumno?.nombre}</DialogTitle><DialogDescription>Saldo actual: {formatSoles(selectedAlumno?.saldo ?? 0)}</DialogDescription></DialogHeader>
-                        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-                        <div className="flex gap-2"><Button variant={transactionForm.tipo === 'deposito' ? 'default' : 'outline'} onClick={() => setTransactionForm(prev => ({ ...prev, tipo: 'deposito' }))} className="flex-1"><PlusCircle className="mr-2 h-4 w-4" />Depósito</Button><Button variant={transactionForm.tipo === 'retiro' ? 'default' : 'outline'} onClick={() => setTransactionForm(prev => ({ ...prev, tipo: 'retiro' }))} className="flex-1"><MinusCircle className="mr-2 h-4 w-4" />Retiro</Button></div>
-                        <div><Label htmlFor="monto">Monto (S/)</Label><Input id="monto" type="number" placeholder="0.00" value={transactionForm.monto} onChange={(e) => setTransactionForm(prev => ({ ...prev, monto: e.target.value }))} /></div>
-                        <DialogFooter><Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button><Button onClick={confirmTransaction} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar</Button></DialogFooter>
+                        <div className="space-y-4 py-4">
+                            <div className="flex gap-2"><Button variant={transactionForm.tipo === 'deposito' ? 'default' : 'outline'} onClick={() => setTransactionForm(prev => ({ ...prev, tipo: 'deposito' }))} className="flex-1"><PlusCircle className="mr-2 h-4 w-4" />Depósito</Button><Button variant={transactionForm.tipo === 'retiro' ? 'destructive' : 'outline'} onClick={() => setTransactionForm(prev => ({ ...prev, tipo: 'retiro' }))} className="flex-1"><MinusCircle className="mr-2 h-4 w-4" />Retiro</Button></div>
+                            <div><Label htmlFor="monto">Monto (S/)</Label><Input id="monto" type="number" placeholder="0.00" value={transactionForm.monto} onChange={(e) => setTransactionForm(prev => ({ ...prev, monto: e.target.value }))} /></div>
+                            {error && <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setModal(null)}>Cancelar</Button>
+                            <Button onClick={confirmTransaction} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar</Button>
+                        </DialogFooter>
                     </>}
                 </DialogContent>
             </Dialog>
@@ -1138,62 +1155,72 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
 
 ## File: `src/app/admin/lista-alumnos/page.tsx`
 ```tsx
+// src/app/admin/lista-alumnos/page.tsx
+
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import AlumnosClient from './page-client';
 
-type AlumnoConCuenta = {
+type ClienteConCuenta = {
     id: string;
     nombre_completo: string;
     fecha_creacion: string;
-    tipo?: string;
+    tipo: string | null;
     cuentas: {
         id: string;
         saldo_actual: number;
     }[];
 };
 
-async function getAlumnos() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+async function getClientes() {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
-        // include `tipo` so the UI can show what kind of cliente it is
-        .select(`id, nombre_completo, fecha_creacion, tipo, cuentas(id, saldo_actual)`) 
-        .eq('rol', 'cliente')
+        .select(`id, nombre_completo, fecha_creacion, tipo, cuentas(id, saldo_actual)`)
+        .in('rol', ['cliente', 'personal']) // Incluimos 'personal' si también se gestionan aquí
         .order('nombre_completo', { ascending: true });
 
     if (error) {
-        console.error('Error fetching students:', error);
+        console.error('Error fetching clients:', error);
         return [];
     }
 
-    const typedData = data as AlumnoConCuenta[];
-    
-    return typedData.map(perfil => {
+        // defensively handle null/undefined data
+        const typedData = (data ?? []) as ClienteConCuenta[];
+
+        try {
+            return typedData.map(perfil => {
         const cuentasArr = perfil.cuentas ?? [];
-        // pick first cuenta with a non-null id
         const cuentaVal = cuentasArr.find(c => c && c.id) ?? null;
         return {
             id: perfil.id,
             nombre: perfil.nombre_completo,
             fechaCreacion: perfil.fecha_creacion,
-            cuentaId: cuentaVal?.id ?? '',
-            // ensure numeric conversion (supabase may return numeric as string)
-            saldo: Number(cuentaVal?.saldo_actual) || 0,
             tipo: perfil.tipo ?? 'alumno',
+            cuentaId: cuentaVal?.id ?? '',
+            saldo: Number(cuentaVal?.saldo_actual) || 0,
         };
-    });
+            });
+        } catch (mapError) {
+            console.error('Error mapping clients data:', mapError, { rawData: data });
+            return [];
+        }
 }
 
 export default async function ListaAlumnosPage() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+        try {
+            const supabase = await createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) redirect('/auth/login');
 
-    const alumnos = await getAlumnos();
-    return <AlumnosClient initialAlumnos={alumnos} />;
+            const clientes = await getClientes();
+            return <AlumnosClient initialAlumnos={clientes} />;
+        } catch (pageError) {
+            // Log full error on server for debugging (will appear in logs)
+            console.error('ListaAlumnosPage render error:', pageError);
+            // Rethrow so Next can render error page, but we logged details.
+            throw pageError;
+        }
 }
 ```
 
@@ -3426,6 +3453,8 @@ export const createClient = async () => {
 
 ## File: `src/lib/utils.ts`
 ```ts
+// src/lib/utils.ts
+
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -3433,14 +3462,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatSoles(amount: number): string {
-  // Accept number or numeric string; fallback to 0
-  const value = typeof amount === 'number' ? amount : Number(amount);
-  const safe = Number.isFinite(value) ? value : 0;
+export function formatSoles(amount: number | string | null | undefined): string {
+  const numericValue = Number(amount);
+  const valueToFormat = Number.isFinite(numericValue) ? numericValue : 0;
+  
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
     currency: 'PEN',
-  }).format(safe);
+  }).format(valueToFormat);
 }
 ```
 
@@ -3785,6 +3814,97 @@ export const corsHeaders = {
   'Access-Control-Allow-Credentials': 'true',
 };
 
+```
+
+## File: `supabase/functions/borrar-usuario-cliente/index.ts`
+```ts
+// supabase/functions/borrar-usuario-cliente/index.ts
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // 1. Verificar que el que llama es un administrador
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      throw new Error('Missing or invalid Authorization header');
+    }
+    const token = authHeader.split(' ')[1];
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    
+    if (!user) {
+      throw new Error('Authentication failed');
+    }
+    
+    const { data: adminProfile } = await supabaseAdmin
+      .from('perfiles')
+      .select('rol')
+      .eq('id', user.id)
+      .single();
+
+    if (!adminProfile || !['admin', 'personal'].includes(adminProfile.rol)) {
+      throw new Error('Forbidden: User does not have admin privileges.');
+    }
+
+    // 2. Obtener el userId a eliminar del cuerpo de la solicitud
+    const { userId } = await req.json();
+    if (!userId) {
+      throw new Error('userId is required in the request body.');
+    }
+
+    // 3. Realizar la eliminación en orden para respetar las claves foráneas
+    
+    // Primero, obtener el ID de la cuenta asociada al perfil
+    const { data: cuenta } = await supabaseAdmin
+      .from('cuentas')
+      .select('id')
+      .eq('usuario_id', userId)
+      .single();
+
+    if (cuenta) {
+      // Eliminar transacciones relacionadas a esa cuenta
+      await supabaseAdmin
+        .from('transacciones')
+        .delete()
+        .or(`cuenta_origen_id.eq.${cuenta.id},cuenta_destino_id.eq.${cuenta.id}`);
+      
+      // Eliminar la cuenta
+      await supabaseAdmin.from('cuentas').delete().eq('usuario_id', userId);
+    }
+    
+    // Eliminar el perfil
+    await supabaseAdmin.from('perfiles').delete().eq('id', userId);
+    
+    // Finalmente, eliminar el usuario de Supabase Auth
+    const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (deleteUserError) {
+        throw deleteUserError;
+    }
+
+    return new Response(JSON.stringify({ message: 'User deleted successfully' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error('Error deleting user:', error.message);
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+});
 ```
 
 ## File: `supabase/functions/crear-usuario-cliente/index.ts`
