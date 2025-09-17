@@ -30,15 +30,20 @@ async function getAlumnos() {
 
     const typedData = data as AlumnoConCuenta[];
     
-    return typedData.map(perfil => ({
-        id: perfil.id,
-        nombre: perfil.nombre_completo,
-        fechaCreacion: perfil.fecha_creacion,
-        cuentaId: perfil.cuentas?.[0]?.id ?? '',
-        // ensure numeric conversion (supabase may return numeric as string)
-        saldo: Number(perfil.cuentas?.[0]?.saldo_actual) || 0,
-        tipo: perfil.tipo ?? 'alumno',
-    }));
+    return typedData.map(perfil => {
+        const cuentasArr = perfil.cuentas ?? [];
+        // pick first cuenta with a non-null id
+        const cuentaVal = cuentasArr.find(c => c && c.id) ?? null;
+        return {
+            id: perfil.id,
+            nombre: perfil.nombre_completo,
+            fechaCreacion: perfil.fecha_creacion,
+            cuentaId: cuentaVal?.id ?? '',
+            // ensure numeric conversion (supabase may return numeric as string)
+            saldo: Number(cuentaVal?.saldo_actual) || 0,
+            tipo: perfil.tipo ?? 'alumno',
+        };
+    });
 }
 
 export default async function ListaAlumnosPage() {
