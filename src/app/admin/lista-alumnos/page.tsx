@@ -27,16 +27,19 @@ async function getClientes() {
         console.error('Error fetching clients:', error);
         return [];
     }
-    
-    return data.map(perfil => {
-        const cuenta = perfil.cuentas?.[0] ?? null;
+
+    const typedData = data as ClienteConCuenta[];
+
+    return typedData.map(perfil => {
+        const cuentasArr = perfil.cuentas ?? [];
+        const cuentaVal = cuentasArr.find(c => c && c.id) ?? null;
         return {
             id: perfil.id,
             nombre: perfil.nombre_completo,
             fechaCreacion: perfil.fecha_creacion,
             tipo: perfil.tipo ?? 'alumno',
-            cuentaId: cuenta?.id ?? '',
-            saldo: cuenta?.saldo_actual ?? 0,
+            cuentaId: cuentaVal?.id ?? '',
+            saldo: Number(cuentaVal?.saldo_actual) || 0,
         };
     });
 }
