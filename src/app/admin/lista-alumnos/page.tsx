@@ -1,57 +1,51 @@
+// src/app/admin/lista-alumnos/page.tsx
+
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import AlumnosClient from './page-client';
 
-type AlumnoConCuenta = {
+type ClienteConCuenta = {
     id: string;
     nombre_completo: string;
     fecha_creacion: string;
-    tipo?: string;
+    tipo: string | null;
     cuentas: {
         id: string;
         saldo_actual: number;
     }[];
 };
 
-async function getAlumnos() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
+async function getClientes() {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
-        // include `tipo` so the UI can show what kind of cliente it is
-        .select(`id, nombre_completo, fecha_creacion, tipo, cuentas(id, saldo_actual)`) 
-        .eq('rol', 'cliente')
+        .select(`id, nombre_completo, fecha_creacion, tipo, cuentas(id, saldo_actual)`)
+        .in('rol', ['cliente', 'personal']) // Incluimos 'personal' si también se gestionan aquí
         .order('nombre_completo', { ascending: true });
 
     if (error) {
-        console.error('Error fetching students:', error);
+        console.error('Error fetching clients:', error);
         return [];
     }
-
-    const typedData = data as AlumnoConCuenta[];
     
-    return typedData.map(perfil => {
-        const cuentasArr = perfil.cuentas ?? [];
-        // pick first cuenta with a non-null id
-        const cuentaVal = cuentasArr.find(c => c && c.id) ?? null;
+    return data.map(perfil => {
+        const cuenta = perfil.cuentas?.[0] ?? null;
         return {
             id: perfil.id,
             nombre: perfil.nombre_completo,
             fechaCreacion: perfil.fecha_creacion,
-            cuentaId: cuentaVal?.id ?? '',
-            // ensure numeric conversion (supabase may return numeric as string)
-            saldo: Number(cuentaVal?.saldo_actual) || 0,
             tipo: perfil.tipo ?? 'alumno',
+            cuentaId: cuenta?.id ?? '',
+            saldo: cuenta?.saldo_actual ?? 0,
         };
     });
 }
 
 export default async function ListaAlumnosPage() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect('/auth/login');
 
-    const alumnos = await getAlumnos();
-    return <AlumnosClient initialAlumnos={alumnos} />;
+    const clientes = await getClientes();
+    return <AlumnosClient initialAlumnos={clientes} />;
 }

@@ -7,6 +7,7 @@ banco_ie/
 ├── errores
 ├── eslint.config.mjs
 ├── export-codebase.py
+├── next-env.d.ts
 ├── next.config.ts
 ├── package.json
 ├── postcss.config.mjs
@@ -81,8 +82,6 @@ banco_ie/
 │   │   ├── _shared
 │   │   │   └── cors.ts
 │   │   ├── crear-usuario-cliente
-│   │   │   ├── _shared
-│   │   │   │   └── cors.ts
 │   │   │   └── index.ts
 │   │   ├── gestionar-fondos
 │   │   │   └── index.ts
@@ -502,6 +501,16 @@ def generate_codebase_markdown(base_path: str = ".", output_file: str = "full_co
 # If the script is run directly 
 if __name__ == "__main__":
     generate_codebase_markdown()
+```
+
+## File: `next-env.d.ts`
+```ts
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
 ```
 
 ## File: `next.config.ts`
@@ -953,6 +962,7 @@ type Alumno = {
     fechaCreacion: string;
     cuentaId: string;
     saldo: number;
+    tipo?: string;
 };
 
 type AlumnosClientProps = {
@@ -960,9 +970,11 @@ type AlumnosClientProps = {
 };
 
 export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
-    const [alumnos, setAlumnos] = useState(initialAlumnos);
+    // normalize incoming data: ensure saldo is a number and tipo exists
+    const normalize = (a: Alumno) => ({ ...a, saldo: Number(a.saldo) || 0, tipo: a.tipo ?? 'alumno' });
+    const [alumnos, setAlumnos] = useState<Alumno[]>(() => initialAlumnos.map(normalize));
     useEffect(() => {
-        setAlumnos(initialAlumnos);
+        setAlumnos(initialAlumnos.map(normalize));
     }, [initialAlumnos]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAlumno, setSelectedAlumno] = useState<Alumno | null>(null);
@@ -1041,7 +1053,8 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
     );
 
     const openModal = (type: 'edit' | 'delete' | 'transaction', alumno: Alumno) => {
-        setSelectedAlumno(alumno);
+        const normalized = normalize(alumno);
+        setSelectedAlumno(normalized);
         if (type === 'edit') setEditForm({ nombre: alumno.nombre });
         if (type === 'transaction') setTransactionForm({ tipo: 'deposito', monto: '' });
         setError('');
@@ -1052,7 +1065,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Búsqueda de Alumnos</CardTitle>
+                    <CardTitle>Búsqueda de Clientes</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="relative">
@@ -1063,13 +1076,14 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle>Lista de Estudiantes ({filteredAlumnos.length})</CardTitle>
+                    <CardTitle>Lista de Clientes ({filteredAlumnos.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
+                                <TableHead>Tipo</TableHead>
                                 <TableHead>Saldo</TableHead>
                                 <TableHead>Fecha de Registro</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
@@ -1079,6 +1093,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
                             {filteredAlumnos.map((alumno) => (
                                 <TableRow key={alumno.id}>
                                     <TableCell className="font-medium">{alumno.nombre}</TableCell>
+                                    <TableCell className="capitalize">{alumno.tipo ?? 'alumno'}</TableCell>
                                     <TableCell>{formatSoles(alumno.saldo)}</TableCell>
                                     <TableCell>{new Date(alumno.fechaCreacion).toLocaleDateString('es-PE')}</TableCell>
                                     <TableCell className="text-right space-x-2">
@@ -1131,6 +1146,7 @@ type AlumnoConCuenta = {
     id: string;
     nombre_completo: string;
     fecha_creacion: string;
+    tipo?: string;
     cuentas: {
         id: string;
         saldo_actual: number;
@@ -1142,7 +1158,8 @@ async function getAlumnos() {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('perfiles')
-        .select(`id, nombre_completo, fecha_creacion, cuentas(id, saldo_actual)`)
+        // include `tipo` so the UI can show what kind of cliente it is
+        .select(`id, nombre_completo, fecha_creacion, tipo, cuentas(id, saldo_actual)`) 
         .eq('rol', 'cliente')
         .order('nombre_completo', { ascending: true });
 
@@ -1153,13 +1170,20 @@ async function getAlumnos() {
 
     const typedData = data as AlumnoConCuenta[];
     
-    return typedData.map(perfil => ({
-        id: perfil.id,
-        nombre: perfil.nombre_completo,
-        fechaCreacion: perfil.fecha_creacion,
-        cuentaId: perfil.cuentas?.[0]?.id ?? '',
-        saldo: Number(perfil.cuentas?.[0]?.saldo_actual) || 0,
-    }));
+    return typedData.map(perfil => {
+        const cuentasArr = perfil.cuentas ?? [];
+        // pick first cuenta with a non-null id
+        const cuentaVal = cuentasArr.find(c => c && c.id) ?? null;
+        return {
+            id: perfil.id,
+            nombre: perfil.nombre_completo,
+            fechaCreacion: perfil.fecha_creacion,
+            cuentaId: cuentaVal?.id ?? '',
+            // ensure numeric conversion (supabase may return numeric as string)
+            saldo: Number(cuentaVal?.saldo_actual) || 0,
+            tipo: perfil.tipo ?? 'alumno',
+        };
+    });
 }
 
 export default async function ListaAlumnosPage() {
@@ -1846,6 +1870,8 @@ export default function LoginPage() {
 
 ## File: `src/app/auth/register/page.tsx`
 ```tsx
+// src/app/auth/register/page.tsx
+
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -1887,43 +1913,39 @@ export default function RegisterPage() {
       setError('Las contraseñas no coinciden.');
       return;
     }
+    if (formData.password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres.');
+        return;
+    }
 
     setLoading(true);
 
     try {
       const supabase = createClient();
-      // Llamamos a la Edge Function pública que crea Auth + perfil + cuenta con saldo 0
-      const res = await supabase.functions.invoke('crear-usuario-cliente', {
-        body: { nombre_completo: formData.fullName, email: formData.email, password: formData.password, saldo_inicial: 0, rol: 'cliente', tipo: 'alumno' }
+      
+      const { data, error: invokeError } = await supabase.functions.invoke('crear-usuario-cliente', {
+        body: { 
+          nombre_completo: formData.fullName, 
+          email: formData.email, 
+          password: formData.password 
+        } // El saldo, rol y tipo son definidos por la función para registros públicos
       });
 
-      // The SDK returns a Response-like object; attempt to parse json safely
-      let json: unknown;
-      try {
-        // Some runtimes return a raw object, others a Response-like object
-  const maybe = res as unknown;
-  const maybeJsonFn = typeof (maybe as { json?: unknown }).json === 'function' ? (maybe as { json: () => Promise<unknown> }).json : undefined;
-  json = typeof maybeJsonFn === 'function' ? await maybeJsonFn.call(res) : res;
-      } catch {
-        json = res;
+      if (invokeError) throw invokeError;
+      
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
-      const isErrorLike = (obj: unknown): obj is { error?: unknown } => {
-        return !!obj && typeof obj === 'object' && 'error' in (obj as Record<string, unknown>);
-      };
+      setSuccess('¡Registro exitoso! Ya puedes iniciar sesión.');
+      setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
 
-      if (isErrorLike(json) && json.error) {
-        setError(String(json.error) || 'Error al registrar usuario.');
-      } else {
-        setSuccess('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta.');
-        setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
-      }
     } catch (err) {
-      const unknownErr = err as unknown;
-      const message = unknownErr instanceof Error ? unknownErr.message : String(unknownErr);
-      setError(message || 'Error al registrar usuario.');
+      const error = err as Error;
+      setError(error.message || 'Ocurrió un error inesperado durante el registro.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -3412,16 +3434,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatSoles(amount: number): string {
-  if (typeof amount !== 'number') {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(0);
-  }
+  // Accept number or numeric string; fallback to 0
+  const value = typeof amount === 'number' ? amount : Number(amount);
+  const safe = Number.isFinite(value) ? value : 0;
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
     currency: 'PEN',
-  }).format(amount);
+  }).format(safe);
 }
 ```
 
@@ -3768,32 +3787,20 @@ export const corsHeaders = {
 
 ```
 
-## File: `supabase/functions/crear-usuario-cliente/_shared/cors.ts`
-```ts
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Credentials': 'true',
-};
-```
-
 ## File: `supabase/functions/crear-usuario-cliente/index.ts`
 ```ts
+// supabase/functions/crear-usuario-cliente/index.ts
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// Función para generar un número de cuenta único de 10 dígitos
-function generarNumeroCuenta() {
-  return Math.floor(1000000000 + Math.random() * 9000000000).toString();
-}
-
 serve(async (req: Request) => {
+  // Manejo de la solicitud OPTIONS para CORS
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -3803,146 +3810,100 @@ serve(async (req: Request) => {
     );
 
     const body = await req.json();
-  let { nombre_completo, email, password, saldo_inicial, rol, tipo } = body as any;
+    let { nombre_completo, email, password, saldo_inicial, rol, tipo } = body;
 
-  // Seguridad: determinar si el caller es admin.
-    // La función confía únicamente en Authorization Bearer tokens que identifiquen
-    // a un `perfil` con rol 'personal' o 'admin'. Se eliminó el flujo de secreto compartido
-    // (`ADMIN_CREATE_SECRET`) por simplicidad y seguridad.
+    // --- Verificación de Permisos de Administrador ---
+    // Se confía únicamente en el token JWT para determinar si la llamada es de un admin.
     let isAdminCall = false;
+    const authHeader = req.headers.get('Authorization');
 
-    // 2) Si se proporcionó Authorization Bearer <token>, validar token consultando /auth/v1/user
-    // y comprobar en la tabla `perfiles` que el rol del usuario es admin/personal.
-    if (!isAdminCall) {
-      const authHeader = req.headers.get('authorization') || '';
-      if (authHeader.toLowerCase().startsWith('bearer ')) {
-        try {
-          const token = authHeader.split(' ')[1];
-          const authUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '') + '/auth/v1/user';
-          const userResp = await fetch(authUrl, { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } });
-          if (userResp.ok) {
-            const userJson = await userResp.json();
-            const userId = userJson?.id;
-            if (userId) {
-              // verificar rol en perfiles
-              const { data: perfilData, error: perfilErr } = await supabaseAdmin.from('perfiles').select('rol').eq('id', userId).maybeSingle();
-              if (!perfilErr && perfilData && ['personal', 'admin'].includes(perfilData.rol)) {
-                isAdminCall = true;
-              }
-            }
-          }
-        } catch (e) {
-          // ignore and treat as non-admin
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      
+      if (user) {
+        const { data: perfil, error } = await supabaseAdmin
+          .from('perfiles')
+          .select('rol')
+          .eq('id', user.id)
+          .single();
+        
+        if (perfil && ['personal', 'admin'].includes(perfil.rol)) {
+          isAdminCall = true;
         }
       }
     }
+    
+    console.log(`[crear-usuario-cliente] Is Admin Call: ${isAdminCall}`);
 
-    // Logging diagnóstico mínimo (enmascarar token)
-    try {
-      const authHeaderLog = req.headers.get('authorization') ? 'present' : 'absent';
-      console.log('[crear-usuario-cliente] authHeader:', authHeaderLog, 'isAdminCall(initial):', isAdminCall);
-    } catch (lErr) {
-      // ignore
-    }
-
-    // Si no es llamada admin, forzamos saldo a 0 y rol a 'cliente'
+    // --- Lógica de Creación ---
+    // Si no es una llamada de admin, se fuerzan los valores por defecto para un registro público.
     if (!isAdminCall) {
       saldo_inicial = 0;
       rol = 'cliente';
       tipo = 'alumno';
     }
 
-    // Normalizar campos
-    saldo_inicial = typeof saldo_inicial === 'number' ? saldo_inicial : parseFloat(saldo_inicial || '0') || 0;
+    // Normalización de datos
+    saldo_inicial = Number(saldo_inicial) || 0;
     rol = rol || 'cliente';
+    tipo = tipo || 'alumno';
 
-    // 1. Crear usuario en Auth
+    // 1. Crear usuario en Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
-      password: password,
-      email_confirm: true,
-      user_metadata: { nombre_completo: nombre_completo }
+      email,
+      password,
+      email_confirm: true, // Auto-confirma el email en un entorno educativo cerrado.
+      user_metadata: { nombre_completo },
     });
     if (authError) throw authError;
     const user = authData.user;
-    if (!user) throw new Error("La creación del usuario en Auth falló.");
 
-    // 2. Crear perfil (usar rol y tipo decididos)
-    const perfilInsert: any = { id: user.id, nombre_completo: nombre_completo, rol: rol };
-    if (tipo) perfilInsert.tipo = tipo;
-    else perfilInsert.tipo = 'alumno';
-
+    // 2. Insertar el perfil del usuario
     const { error: perfilError } = await supabaseAdmin
       .from('perfiles')
-      .insert(perfilInsert);
-    if (perfilError) throw perfilError;
-
-    // 3. Crear cuenta bancaria: preferir la función SQL atómica `create_account_for_user`
-    let cuentaData: any = null;
-    try {
-      const rpcResp = await supabaseAdmin.rpc('create_account_for_user', { p_usuario_id: user.id, p_saldo: saldo_inicial });
-      if (rpcResp.error) throw rpcResp.error;
-      // Normalizar la forma de retorno del RPC: puede venir como array o fila directa
-      if (Array.isArray(rpcResp.data)) cuentaData = rpcResp.data[0];
-      else cuentaData = rpcResp.data;
-  console.log('[crear-usuario-cliente] rpc create_account_for_user result:', { cuentaId: cuentaData?.id, numero_cuenta: cuentaData?.numero_cuenta, saldo: cuentaData?.saldo_actual, requested_saldo: saldo_inicial });
-    } catch (rpcErr) {
-      // Si la función RPC no existe o falla, hacemos fallback a inserción con reintentos
-      let cuentaError: any = null;
-      const maxAttempts = 5;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const numero_cuenta = generarNumeroCuenta();
-        const resp = await supabaseAdmin
-          .from('cuentas')
-          .insert({ usuario_id: user.id, saldo_actual: saldo_inicial, numero_cuenta: numero_cuenta })
-          .select('id')
-          .single();
-        cuentaData = resp.data;
-        cuentaError = resp.error;
-        if (!cuentaError && cuentaData) break;
-        if (cuentaError && attempt === maxAttempts - 1) {
-          throw cuentaError;
-        }
-      }
+      .insert({ id: user.id, nombre_completo, rol, tipo });
+    if (perfilError) {
+      // Si falla la inserción del perfil, eliminar el usuario de Auth para evitar inconsistencias.
+      await supabaseAdmin.auth.admin.deleteUser(user.id);
+      throw perfilError;
     }
 
-    // 4. Registrar depósito inicial si es mayor a cero
-    let nuevoSaldo = cuentaData?.saldo_actual ?? saldo_inicial;
+    // 3. Crear la cuenta bancaria usando la función RPC para garantizar la atomicidad.
+    const { data: cuentaData, error: rpcError } = await supabaseAdmin.rpc('create_account_for_user', {
+      p_usuario_id: user.id,
+      p_saldo: saldo_inicial,
+    });
+    if (rpcError) throw rpcError;
+
+    const cuenta = Array.isArray(cuentaData) ? cuentaData[0] : cuentaData;
+    console.log(`[crear-usuario-cliente] Account created via RPC. ID: ${cuenta.id}, Saldo: ${cuenta.saldo_actual}`);
+    
+    // 4. Si hay saldo inicial, registrar la transacción de depósito.
     if (saldo_inicial > 0) {
-      try {
-        const { data: transData, error: transaccionError } = await supabaseAdmin
-          .from('transacciones')
-          .insert({
-            cuenta_destino_id: cuentaData.id,
-            monto: saldo_inicial,
-            tipo: 'deposito',
-            descripcion: 'Depósito inicial de cuenta'
-          })
-          .select('id')
-          .single();
-        if (transaccionError) throw transaccionError;
-        console.log('[crear-usuario-cliente] transaccion insertada, id:', transData?.id);
-      } catch (txErr) {
-        console.error('[crear-usuario-cliente] error al insertar transaccion inicial:', txErr);
-        throw txErr;
-      }
+      const { error: transaccionError } = await supabaseAdmin
+        .from('transacciones')
+        .insert({
+          cuenta_destino_id: cuenta.id,
+          monto: saldo_inicial,
+          tipo: 'deposito',
+          descripcion: 'Depósito inicial de cuenta',
+        });
+      if (transaccionError) throw transaccionError; // En un escenario real, se podría manejar una compensación.
     }
 
-    // Asegurar que devolvemos información útil para el caller
     const responsePayload = {
+      message: 'Usuario y cuenta creados exitosamente.',
       userId: user.id,
-      cuentaId: cuentaData?.id,
-      numero_cuenta: cuentaData?.numero_cuenta,
-      saldo_inicial: saldo_inicial,
-      message: 'Usuario y cuenta creados exitosamente.'
+      cuentaId: cuenta.id,
     };
-    console.log('[crear-usuario-cliente] success response:', responsePayload);
+
     return new Response(JSON.stringify(responsePayload), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201,
     });
-  } catch (error: any) {
-    console.error("Error en Edge Function:", error);
+  } catch (error) {
+    console.error('[crear-usuario-cliente] Error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
