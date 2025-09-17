@@ -1164,21 +1164,19 @@ import AlumnosClient from './page-client';
 async function getClientes() {
     const supabase = await createClient();
 
-    // CORRECCIÓN: Se cambia el filtro .in() por .eq() para ser más preciso y robusto.
-    // Esto asegura que se obtengan todos los perfiles con el rol de 'cliente'.
     const { data, error } = await supabase
         .from('perfiles')
         .select(`
             id,
             nombre_completo,
             fecha_creacion,
-            tipo,
+            tipo, 
             cuentas (
                 id,
                 saldo_actual
             )
         `)
-        .eq('rol', 'cliente') // Filtro corregido y simplificado.
+        .eq('rol', 'cliente')
         .order('nombre_completo', { ascending: true });
 
     if (error) {
@@ -1186,8 +1184,6 @@ async function getClientes() {
         return [];
     }
 
-    // Mapeo seguro de los datos para pasarlos al componente cliente.
-    // Esto previene errores si un perfil no tiene una cuenta asociada.
     return data.map(perfil => {
         const cuenta = perfil.cuentas?.[0] ?? null;
         return {

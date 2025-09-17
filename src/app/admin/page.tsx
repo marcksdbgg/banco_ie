@@ -1,3 +1,5 @@
+// src/app/admin/page.tsx
+
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,17 +7,10 @@ import { createClient } from '@/lib/supabase/server';
 import { formatSoles } from '@/lib/utils';
 import { Users, UserPlus, Banknote, TrendingUp, ArrowRight, DollarSign } from 'lucide-react';
 import { redirect } from 'next/navigation';
-import { Database } from '@/lib/supabase/database.types';
-
-type Profile = Database['public']['Tables']['perfiles']['Row'];
-type Account = Database['public']['Tables']['cuentas']['Row'];
-type ProfileWithAccount = Profile & {
-    cuentas: Pick<Account, 'saldo_actual'>[];
-};
 
 async function getStats() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient();
+
     const { count, error: countError } = await supabase
       .from('perfiles')
       .select('*', { count: 'exact', head: true })
@@ -26,7 +21,7 @@ async function getStats() {
     const { data: accounts, error: balanceError } = await supabase.from('cuentas').select('saldo_actual');
     if (balanceError) console.error("Error fetching balances:", balanceError);
     
-  const totalBalance = accounts?.reduce((acc, curr) => acc + (Number(curr.saldo_actual) || 0), 0) ?? 0;
+    const totalBalance = accounts?.reduce((acc, curr) => acc + (Number(curr.saldo_actual) || 0), 0) ?? 0;
     
     return {
         totalStudents: count ?? 0,
@@ -35,32 +30,49 @@ async function getStats() {
 }
 
 async function getRecentStudents() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient();
-    const { data, error } = await supabase
+
+    // 1. Obtener los perfiles de clientes más recientes
+    const { data: perfiles, error: perfilesError } = await supabase
         .from('perfiles')
-        .select(`id, nombre_completo, fecha_creacion, cuentas(saldo_actual)`)
+        .select('*')
         .eq('rol', 'cliente')
         .order('fecha_creacion', { ascending: false })
         .limit(3);
 
-    if (error) {
-        console.error("Error fetching recent students:", error);
+    if (perfilesError) {
+        console.error("Error fetching recent students:", perfilesError);
         return [];
     }
-    
-    const typedData = data as ProfileWithAccount[];
 
-  return typedData.map(profile => ({
-    id: profile.id,
-    nombre: profile.nombre_completo,
-    fechaCreacion: profile.fecha_creacion,
-    saldo: Number(profile.cuentas?.[0]?.saldo_actual) || 0,
-  }));
+    // 2. Obtener las cuentas de esos perfiles
+    const userIds = perfiles.map(p => p.id);
+    const { data: cuentas, error: cuentasError } = await supabase
+        .from('cuentas')
+        .select('*')
+        .in('usuario_id', userIds);
+
+    if (cuentasError) {
+        console.error("Error fetching accounts for recent students:", cuentasError);
+        // Devolver perfiles sin saldo si las cuentas fallan
+        return perfiles.map(p => ({ id: p.id, nombre: p.nombre_completo, fechaCreacion: p.fecha_creacion, saldo: 0 }));
+    }
+
+    const cuentasMap = new Map(cuentas.map(c => [c.usuario_id, c]));
+
+    // 3. Combinar los datos
+    return perfiles.map(perfil => {
+        const cuenta = cuentasMap.get(perfil.id);
+        return {
+            id: perfil.id,
+            nombre: perfil.nombre_completo,
+            fechaCreacion: perfil.fecha_creacion,
+            saldo: cuenta?.saldo_actual ?? 0,
+        };
+    });
 }
 
 export default async function AdminDashboard() {
-  // CORRECCIÓN: Se debe usar await para el cliente de servidor
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
@@ -135,7 +147,7 @@ export default async function AdminDashboard() {
                 <div key={student.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div>
                     <p className="font-medium">{student.nombre}</p>
-                    <p className="text-sm text-gray-500">Registrado: {new Date(student.fechaCreacion).toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-500">Registrado: {new Date(student.fechaCreacion).toLocaleDateString('es-PE', { timeZone: 'UTC' })}</p>
                   </div>
                   <p className="font-bold text-chiti_bank-green">{formatSoles(student.saldo)}</p>
                 </div>
