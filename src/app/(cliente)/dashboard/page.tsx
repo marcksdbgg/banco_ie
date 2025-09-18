@@ -1,145 +1,228 @@
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
-import { formatSoles } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { ArrowRight, Banknote, Clock, DollarSign, Send } from 'lucide-react';
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { formatSoles } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Banknote, Clock, DollarSign, Send } from "lucide-react";
+import Image from "next/image";
+import TransactionLine from "@/components/transaction/TransactionLine";
 
-async function getDashboardData(userId: string) {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
-    const supabase = await createClient();
+type Cuenta = {
+  id: string;
+  saldo_actual: number;
+  numero_cuenta: string;
+  usuario_id?: string;
+  [key: string]: unknown;
+};
 
-    const { data: cuenta, error: cuentaError } = await supabase
-        .from('cuentas')
-        .select('*')
-        .eq('usuario_id', userId)
-        .single();
+type Transaccion = {
+  id: string;
+  tipo: string;
+  fecha: string;
+  monto: number;
+  descripcion?: string;
+  cuenta_destino_id?: string;
+  cuenta_origen_id?: string;
+  [key: string]: unknown;
+};
 
-    if (cuentaError || !cuenta) {
-        console.error('Error fetching account data:', cuentaError);
-        return { cuenta: null, transacciones: [] };
-    }
+async function getDashboardData(
+  userId: string,
+): Promise<{ cuenta: Cuenta | null; transacciones: Transaccion[] }> {
+  // CORRECCIÓN: Se debe usar await para el cliente de servidor
+  const supabase = await createClient();
 
-    const { data: transacciones, error: transaccionesError } = await supabase
-        .from('transacciones')
-        .select('*')
-        .or(`cuenta_origen_id.eq.${cuenta.id},cuenta_destino_id.eq.${cuenta.id}`)
-        .order('fecha', { ascending: false })
-        .limit(10);
+  const { data: cuenta, error: cuentaError } = await supabase
+    .from("cuentas")
+    .select("*")
+    .eq("usuario_id", userId)
+    .single();
 
-    if (transaccionesError) {
-        console.error('Error fetching transactions:', transaccionesError);
-    }
+  if (cuentaError || !cuenta) {
+    console.error("Error fetching account data:", cuentaError);
+    return { cuenta: null, transacciones: [] };
+  }
 
-    return {
-        cuenta,
-        transacciones: transacciones || [],
-    };
+  const { data: transacciones, error: transaccionesError } = await supabase
+    .from("transacciones")
+    .select("*")
+    .or(`cuenta_origen_id.eq.${cuenta.id},cuenta_destino_id.eq.${cuenta.id}`)
+    .order("fecha", { ascending: false })
+    .limit(10);
+
+  if (transaccionesError) {
+    console.error("Error fetching transactions:", transaccionesError);
+  }
+
+  return {
+    cuenta: cuenta as Cuenta | null,
+    transacciones: (transacciones || []) as Transaccion[],
+  };
 }
 
 export default async function DashboardPage() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+  // CORRECCIÓN: Se debe usar await para el cliente de servidor
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    if (!user) {
-        return redirect('/auth/login');
-    }
+  if (!user) {
+    return redirect("/auth/login");
+  }
 
-    const { cuenta, transacciones } = await getDashboardData(user.id);
+  const { cuenta, transacciones } = await getDashboardData(user.id);
 
-    if (!cuenta) {
-        return (
-            <div className="text-center p-4">
-                <h2 className="text-xl font-semibold">No se encontró una cuenta asociada.</h2>
-                <p>Por favor, contacte a un administrador.</p>
-            </div>
-        );
-    }
-
+  if (!cuenta) {
     return (
-        <div className="space-y-8">
-            <div className="text-center md:text-left">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Hola, {user.user_metadata.nombre_completo || 'Estudiante'}
-                </h1>
-                <p className="text-gray-600">
-                    Bienvenido a tu portal financiero.
-                </p>
-            </div>
-
-            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        <span>Saldo Actual</span>
-                        <DollarSign className="h-6 w-6" />
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-4xl font-bold">{formatSoles(cuenta.saldo_actual)}</p>
-                    <p className="text-sm opacity-80">Número de cuenta: {cuenta.numero_cuenta}</p>
-                </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <Send className="h-5 w-5 mr-2 text-blue-500" />
-                            Realizar una Transferencia
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-gray-600 mb-4">Envía dinero a otros compañeros de forma rápida y segura.</p>
-                        <Button asChild className="w-full">
-                            <Link href="/dashboard/transferir">
-                                Nueva Transferencia <ArrowRight className="h-4 w-4 ml-2" />
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <Banknote className="h-5 w-5 mr-2 text-green-500" />
-                            Ver todos mis movimientos
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-gray-600 mb-4">Consulta el historial completo de tus transacciones.</p>
-                        <Button variant="outline" className="w-full" disabled>
-                            Ver Historial Completo <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center">
-                        <Clock className="h-5 w-5 mr-2 text-gray-500" />
-                        Actividad Reciente
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {transacciones.length > 0 ? transacciones.map(t => (
-                            <div key={t.id} className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold capitalize">{t.tipo}</p>
-                                    <p className="text-sm text-gray-500">{new Date(t.fecha).toLocaleString('es-PE')}</p>
-                                </div>
-                                <p className={`font-bold ${t.cuenta_destino_id === cuenta.id ? 'text-green-600' : 'text-red-600'}`}>
-                                    {t.cuenta_destino_id === cuenta.id ? '+' : '-'} {formatSoles(t.monto)}
-                                </p>
-                            </div>
-                        )) : (
-                            <p className="text-center text-gray-500 py-4">No hay transacciones recientes.</p>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+      <div className="text-center p-4">
+        <h2 className="text-xl font-semibold">
+          No se encontró una cuenta asociada.
+        </h2>
+        <p>Por favor, contacte a un administrador.</p>
+      </div>
     );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+            Hola, {user.user_metadata.nombre_completo || "Estudiante"}
+          </h1>
+          <p className="text-gray-600">Bienvenido a tu portal financiero.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button asChild>
+            <Link
+              href="/dashboard/transferir"
+              className="flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Nueva Transferencia
+            </Link>
+          </Button>
+          <Button variant="outline" className="hidden md:inline-flex">
+            <Banknote className="h-4 w-4 mr-2" /> Ver Historial
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2">
+          <Card className="bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Saldo Actual</p>
+                  <p className="text-4xl font-extrabold mt-2">
+                    {formatSoles(cuenta.saldo_actual)}
+                  </p>
+                  <p className="text-sm opacity-80 mt-1">
+                    Número de cuenta:{" "}
+                    <span className="font-medium">{cuenta.numero_cuenta}</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <DollarSign className="h-12 w-12 opacity-90" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="h-5 w-5 mr-2 text-gray-500" />
+                Actividad Reciente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-64 overflow-auto">
+                {transacciones.length > 0 ? (
+                  <div className="divide-y">
+                    {transacciones.map((t: Transaccion) => (
+                      <TransactionLine key={t.id} t={t} cuentaId={cuenta.id} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="mx-auto mb-4 opacity-80">
+                      <Image
+                        src="/empty-transactions.svg"
+                        alt="No transactions"
+                        width={96}
+                        height={96}
+                      />
+                    </div>
+                    <p className="text-gray-500">
+                      No hay transacciones recientes.
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Realiza una transferencia para ver actividad aquí.
+                    </p>
+                    <div className="mt-4">
+                      <Button asChild>
+                        <Link href="/dashboard/transferir">
+                          Realizar mi primera transferencia
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Acciones Rápidas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/dashboard/transferir"
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Nueva Transferencia
+                </Link>
+                <a className="text-sm text-gray-600">Ver Beneficiarios</a>
+                <a className="text-sm text-gray-600">Solicitar Ayuda</a>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumen</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">Saldo disponible</p>
+                  <p className="font-medium">
+                    {formatSoles(cuenta.saldo_actual)}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">Última actividad</p>
+                  <p className="text-sm text-gray-500">
+                    {transacciones[0]
+                      ? new Date(transacciones[0].fecha).toLocaleDateString(
+                          "es-PE",
+                        )
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
 }
