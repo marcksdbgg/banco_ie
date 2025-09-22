@@ -4,11 +4,12 @@
 ALTER TABLE IF EXISTS public.perfiles
   ADD COLUMN IF NOT EXISTS tipo text NOT NULL DEFAULT 'alumno';
 
--- Ensure the rol constraint includes system roles: cliente, personal, admin
+-- Ensure the rol constraint includes system roles: cliente, admin
+-- NOTE: 'personal' is a profile type, not a system role. Roles should be either 'cliente' or 'admin'.
 ALTER TABLE IF EXISTS public.perfiles
   DROP CONSTRAINT IF EXISTS rol_valido;
 ALTER TABLE IF EXISTS public.perfiles
-  ADD CONSTRAINT rol_valido CHECK (rol IN ('cliente', 'personal', 'admin'));
+  ADD CONSTRAINT rol_valido CHECK (rol IN ('cliente', 'admin'));
 
 -- Add a constraint for tipo values used by the UI: alumno, padre, personal
 ALTER TABLE IF EXISTS public.perfiles

@@ -26,7 +26,7 @@ export function AdminNavigation() {
         },
         {
             href: "/admin/lista-alumnos",
-            label: "Alumnos",
+            label: "Clientes",
             icon: Users,
         },
         {

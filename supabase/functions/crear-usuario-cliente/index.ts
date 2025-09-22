@@ -37,7 +37,7 @@ serve(async (req: Request) => {
           .eq('id', user.id)
           .single();
         
-        if (perfil && ['personal', 'admin'].includes(perfil.rol)) {
+        if (perfil && perfil.rol === 'admin') {
           isAdminCall = true;
         }
       }
@@ -46,17 +46,30 @@ serve(async (req: Request) => {
     console.log(`[crear-usuario-cliente] Is Admin Call: ${isAdminCall}`);
 
     // --- Lógica de Creación ---
-    // Si no es una llamada de admin, se fuerzan los valores por defecto para un registro público.
+    // Normalización y validación de datos
+    saldo_inicial = Number(saldo_inicial) || 0;
+
+    // Valid roles and tipos
+    const validTipos = ['alumno', 'padre', 'personal'];
+
+    // If this is not an admin call, force system role to 'cliente' and default tipo to 'alumno'
     if (!isAdminCall) {
-      saldo_inicial = 0;
       rol = 'cliente';
       tipo = 'alumno';
+      saldo_inicial = 0; // force zero for public registrations
+    } else {
+      // Admin calls may create admin users only if explicitly requested
+      if (rol === 'admin') {
+        // keep as admin
+      } else {
+        // For any other value, treat as cliente
+        rol = 'cliente';
+      }
+      // Validate tipo
+      if (!validTipos.includes(tipo)) {
+        tipo = 'alumno';
+      }
     }
-
-    // Normalización de datos
-    saldo_inicial = Number(saldo_inicial) || 0;
-    rol = rol || 'cliente';
-    tipo = tipo || 'alumno';
 
     // 1. Crear usuario en Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

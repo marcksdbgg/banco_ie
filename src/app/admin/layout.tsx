@@ -11,7 +11,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect('/auth/login');
 
   const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).maybeSingle();
-  if (!perfil || !['personal', 'admin'].includes(perfil.rol)) redirect('/auth/login');
+  // Only 'admin' role should have access to this layout. 'personal' is a tipo, not a role.
+  if (!perfil || perfil.rol !== 'admin') redirect('/auth/login');
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

@@ -22,7 +22,7 @@ export default function NuevoAlumnoPage() {
     email: '',
     password: '',
     montoInicial: '0',
-    rol: 'alumno', // 'rol' aquí se usa para el tipo de perfil en la UI
+    tipo: 'alumno', // 'tipo' aquí representa alumno|padre|personal
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -69,8 +69,10 @@ export default function NuevoAlumnoPage() {
           password: formData.password,
           saldo_inicial: parseFloat(formData.montoInicial),
           // Mapeo correcto de rol y tipo para la base de datos
-          rol: formData.rol === 'personal' ? 'personal' : 'cliente',
-          tipo: formData.rol, // 'alumno', 'padre', o 'personal'
+          // Always set the system role to 'cliente' when creating client users from the admin panel.
+          rol: 'cliente',
+          // The 'tipo' column stores the kind of client: 'alumno', 'padre', or 'personal'.
+          tipo: formData.tipo, 
         },
       });
 
@@ -168,7 +170,7 @@ export default function NuevoAlumnoPage() {
 
             <div className="space-y-2">
               <Label htmlFor="rol">Tipo de Perfil</Label>
-              <select id="rol" name="rol" value={formData.rol} onChange={handleInputChange} className="w-full border rounded p-2 bg-white text-sm">
+              <select id="tipo" name="tipo" value={formData.tipo} onChange={handleInputChange} className="w-full border rounded p-2 bg-white text-sm">
                 <option value="alumno">Alumno</option>
                 <option value="padre">Padre de Familia</option>
                 <option value="personal">Personal de la IE</option>

@@ -13,6 +13,7 @@ banco_ie/
 ├── postcss.config.mjs
 ├── public
 │   ├── chitibank-logo.jpeg
+│   ├── empty-transactions.svg
 │   ├── file.svg
 │   ├── globe.svg
 │   ├── next.svg
@@ -21,6 +22,10 @@ banco_ie/
 ├── src
 │   ├── app
 │   │   ├── (cliente)
+│   │   │   ├── bazar
+│   │   │   │   └── page.tsx
+│   │   │   ├── comedor
+│   │   │   │   └── page.tsx
 │   │   │   ├── dashboard
 │   │   │   │   ├── page.tsx
 │   │   │   │   └── transferir
@@ -58,6 +63,9 @@ banco_ie/
 │   │   ├── admin-guard.tsx
 │   │   ├── admin-navigation.tsx
 │   │   ├── client-guard.tsx
+│   │   ├── client-navigation.tsx
+│   │   ├── transaction
+│   │   │   └── TransactionLine.tsx
 │   │   └── ui
 │   │       ├── alert.tsx
 │   │       ├── button.tsx
@@ -539,6 +547,16 @@ export default config;
 
 ## File: `public/chitibank-logo.jpeg`
 _[Skipped: binary or non-UTF8 file]_
+## File: `public/empty-transactions.svg`
+```svg
+<svg width="160" height="160" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect width="24" height="24" rx="4" fill="#f3f4f6"/>
+  <path d="M6 12h12" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 8h12" stroke="#D1D5DB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 16h12" stroke="#D1D5DB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+```
+
 ## File: `public/file.svg`
 ```svg
 <svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
@@ -564,153 +582,309 @@ _[Skipped: binary or non-UTF8 file]_
 <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
 ```
 
+## File: `src/app/(cliente)/bazar/page.tsx`
+```tsx
+import Link from "next/link";
+
+export default function BazarPage() {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-4">Bazar Escolar</h2>
+      <p className="text-gray-600 mb-6">
+        Compra útiles y objetos del colegio con tu saldo. Página en construcción
+        — aquí aparecerán productos y opciones de pago.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-4 border rounded">
+          Ejemplo: Cuaderno — S/ 2.00{" "}
+          <div className="mt-2">
+            <Link href="#" className="text-sm text-blue-600">
+              Comprar
+            </Link>
+          </div>
+        </div>
+        <div className="p-4 border rounded">
+          Ejemplo: Lápiz — S/ 0.50{" "}
+          <div className="mt-2">
+            <Link href="#" className="text-sm text-blue-600">
+              Comprar
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+```
+
+## File: `src/app/(cliente)/comedor/page.tsx`
+```tsx
+import Link from "next/link";
+
+export default function ComedorPage() {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-4">Comedor</h2>
+      <p className="text-gray-600 mb-6">
+        Compra almuerzos y snacks con tu saldo escolar. Página en construcción —
+        aquí aparecerán menús y precios.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-4 border rounded">
+          Ejemplo: Menú del día — S/ 3.50{" "}
+          <div className="mt-2">
+            <Link href="#" className="text-sm text-blue-600">
+              Comprar
+            </Link>
+          </div>
+        </div>
+        <div className="p-4 border rounded">
+          Ejemplo: Jugo natural — S/ 1.50{" "}
+          <div className="mt-2">
+            <Link href="#" className="text-sm text-blue-600">
+              Comprar
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+```
+
 ## File: `src/app/(cliente)/dashboard/page.tsx`
 ```tsx
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
-import { formatSoles } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { ArrowRight, Banknote, Clock, DollarSign, Send } from 'lucide-react';
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { formatSoles } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Banknote, Clock, DollarSign, Send } from "lucide-react";
+import Image from "next/image";
+import TransactionLine from "@/components/transaction/TransactionLine";
 
-async function getDashboardData(userId: string) {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
-    const supabase = await createClient();
+type Cuenta = {
+  id: string;
+  saldo_actual: number;
+  numero_cuenta: string;
+  usuario_id?: string;
+  [key: string]: unknown;
+};
 
-    const { data: cuenta, error: cuentaError } = await supabase
-        .from('cuentas')
-        .select('*')
-        .eq('usuario_id', userId)
-        .single();
+type Transaccion = {
+  id: string;
+  tipo: string;
+  fecha: string;
+  monto: number;
+  descripcion?: string;
+  cuenta_destino_id?: string;
+  cuenta_origen_id?: string;
+  [key: string]: unknown;
+};
 
-    if (cuentaError || !cuenta) {
-        console.error('Error fetching account data:', cuentaError);
-        return { cuenta: null, transacciones: [] };
-    }
+async function getDashboardData(
+  userId: string,
+): Promise<{ cuenta: Cuenta | null; transacciones: Transaccion[] }> {
+  // CORRECCIÓN: Se debe usar await para el cliente de servidor
+  const supabase = await createClient();
 
-    const { data: transacciones, error: transaccionesError } = await supabase
-        .from('transacciones')
-        .select('*')
-        .or(`cuenta_origen_id.eq.${cuenta.id},cuenta_destino_id.eq.${cuenta.id}`)
-        .order('fecha', { ascending: false })
-        .limit(10);
+  const { data: cuenta, error: cuentaError } = await supabase
+    .from("cuentas")
+    .select("*")
+    .eq("usuario_id", userId)
+    .single();
 
-    if (transaccionesError) {
-        console.error('Error fetching transactions:', transaccionesError);
-    }
+  if (cuentaError || !cuenta) {
+    console.error("Error fetching account data:", cuentaError);
+    return { cuenta: null, transacciones: [] };
+  }
 
-    return {
-        cuenta,
-        transacciones: transacciones || [],
-    };
+  const { data: transacciones, error: transaccionesError } = await supabase
+    .from("transacciones")
+    .select("*")
+    .or(`cuenta_origen_id.eq.${cuenta.id},cuenta_destino_id.eq.${cuenta.id}`)
+    .order("fecha", { ascending: false })
+    .limit(10);
+
+  if (transaccionesError) {
+    console.error("Error fetching transactions:", transaccionesError);
+  }
+
+  return {
+    cuenta: cuenta as Cuenta | null,
+    transacciones: (transacciones || []) as Transaccion[],
+  };
 }
 
 export default async function DashboardPage() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+  // CORRECCIÓN: Se debe usar await para el cliente de servidor
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    if (!user) {
-        return redirect('/auth/login');
-    }
+  if (!user) {
+    return redirect("/auth/login");
+  }
 
-    const { cuenta, transacciones } = await getDashboardData(user.id);
+  const { cuenta, transacciones } = await getDashboardData(user.id);
 
-    if (!cuenta) {
-        return (
-            <div className="text-center p-4">
-                <h2 className="text-xl font-semibold">No se encontró una cuenta asociada.</h2>
-                <p>Por favor, contacte a un administrador.</p>
-            </div>
-        );
-    }
-
+  if (!cuenta) {
     return (
-        <div className="space-y-8">
-            <div className="text-center md:text-left">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Hola, {user.user_metadata.nombre_completo || 'Estudiante'}
-                </h1>
-                <p className="text-gray-600">
-                    Bienvenido a tu portal financiero.
-                </p>
-            </div>
-
-            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        <span>Saldo Actual</span>
-                        <DollarSign className="h-6 w-6" />
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-4xl font-bold">{formatSoles(cuenta.saldo_actual)}</p>
-                    <p className="text-sm opacity-80">Número de cuenta: {cuenta.numero_cuenta}</p>
-                </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <Send className="h-5 w-5 mr-2 text-blue-500" />
-                            Realizar una Transferencia
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-gray-600 mb-4">Envía dinero a otros compañeros de forma rápida y segura.</p>
-                        <Button asChild className="w-full">
-                            <Link href="/dashboard/transferir">
-                                Nueva Transferencia <ArrowRight className="h-4 w-4 ml-2" />
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <Banknote className="h-5 w-5 mr-2 text-green-500" />
-                            Ver todos mis movimientos
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-gray-600 mb-4">Consulta el historial completo de tus transacciones.</p>
-                        <Button variant="outline" className="w-full" disabled>
-                            Ver Historial Completo <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center">
-                        <Clock className="h-5 w-5 mr-2 text-gray-500" />
-                        Actividad Reciente
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {transacciones.length > 0 ? transacciones.map(t => (
-                            <div key={t.id} className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold capitalize">{t.tipo}</p>
-                                    <p className="text-sm text-gray-500">{new Date(t.fecha).toLocaleString('es-PE')}</p>
-                                </div>
-                                <p className={`font-bold ${t.cuenta_destino_id === cuenta.id ? 'text-green-600' : 'text-red-600'}`}>
-                                    {t.cuenta_destino_id === cuenta.id ? '+' : '-'} {formatSoles(t.monto)}
-                                </p>
-                            </div>
-                        )) : (
-                            <p className="text-center text-gray-500 py-4">No hay transacciones recientes.</p>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+      <div className="text-center p-4">
+        <h2 className="text-xl font-semibold">
+          No se encontró una cuenta asociada.
+        </h2>
+        <p>Por favor, contacte a un administrador.</p>
+      </div>
     );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+            Hola, {user.user_metadata.nombre_completo || "Estudiante"}
+          </h1>
+          <p className="text-gray-600">Bienvenido a tu portal financiero.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button asChild>
+            <Link
+              href="/dashboard/transferir"
+              className="flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Nueva Transferencia
+            </Link>
+          </Button>
+          <Button variant="outline" className="hidden md:inline-flex">
+            <Banknote className="h-4 w-4 mr-2" /> Ver Historial
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2">
+          <Card className="bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Saldo Actual</p>
+                  <p className="text-4xl font-extrabold mt-2">
+                    {formatSoles(cuenta.saldo_actual)}
+                  </p>
+                  <p className="text-sm opacity-80 mt-1">
+                    Número de cuenta:{" "}
+                    <span className="font-medium">{cuenta.numero_cuenta}</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <DollarSign className="h-12 w-12 opacity-90" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="h-5 w-5 mr-2 text-gray-500" />
+                Actividad Reciente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-64 overflow-auto">
+                {transacciones.length > 0 ? (
+                  <div className="divide-y">
+                    {transacciones.map((t: Transaccion) => (
+                      <TransactionLine key={t.id} t={t} cuentaId={cuenta.id} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="mx-auto mb-4 opacity-80">
+                      <Image
+                        src="/empty-transactions.svg"
+                        alt="No transactions"
+                        width={96}
+                        height={96}
+                      />
+                    </div>
+                    <p className="text-gray-500">
+                      No hay transacciones recientes.
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Realiza una transferencia para ver actividad aquí.
+                    </p>
+                    <div className="mt-4">
+                      <Button asChild>
+                        <Link href="/dashboard/transferir">
+                          Realizar mi primera transferencia
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Acciones Rápidas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/dashboard/transferir"
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Nueva Transferencia
+                </Link>
+                <a className="text-sm text-gray-600">Ver Beneficiarios</a>
+                <a className="text-sm text-gray-600">Solicitar Ayuda</a>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumen</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">Saldo disponible</p>
+                  <p className="font-medium">
+                    {formatSoles(cuenta.saldo_actual)}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">Última actividad</p>
+                  <p className="text-sm text-gray-500">
+                    {transacciones[0]
+                      ? new Date(transacciones[0].fecha).toLocaleDateString(
+                          "es-PE",
+                        )
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
 }
+
 ```
 
 ## File: `src/app/(cliente)/dashboard/transferir/page.tsx`
@@ -855,18 +1029,36 @@ export default function TransferPage() {
 
 ## File: `src/app/(cliente)/layout.tsx`
 ```tsx
-import { createClient as createServerClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import ClientNavigation from "@/components/client-navigation";
 
-export default async function ClienteLayout({ children }: { children: React.ReactNode }) {
+export default async function ClienteLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
 
-  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).maybeSingle();
-  if (!perfil || perfil.rol !== 'cliente') redirect('/auth/login');
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("rol")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!perfil || perfil.rol !== "cliente") redirect("/auth/login");
 
-  return <>{children}</>;
+  return (
+    <>
+      <ClientNavigation />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+      </main>
+    </>
+  );
 }
 
 ```
@@ -1164,28 +1356,33 @@ import AlumnosClient from './page-client';
 async function getClientes() {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
+    // 1. Obtener todos los perfiles de clientes
+    const { data: perfiles, error: perfilesError } = await supabase
         .from('perfiles')
-        .select(`
-            id,
-            nombre_completo,
-            fecha_creacion,
-            tipo, 
-            cuentas (
-                id,
-                saldo_actual
-            )
-        `)
-        .eq('rol', 'cliente')
-        .order('nombre_completo', { ascending: true });
+        .select('*')
+        .eq('rol', 'cliente');
 
-    if (error) {
-        console.error('Error fetching clients:', error);
+    if (perfilesError) {
+        console.error('Error fetching profiles:', perfilesError);
+        return [];
+    }
+    
+    // 2. Obtener todas las cuentas
+    const { data: cuentas, error: cuentasError } = await supabase
+        .from('cuentas')
+        .select('*');
+
+    if (cuentasError) {
+        console.error('Error fetching accounts:', cuentasError);
         return [];
     }
 
-    return data.map(perfil => {
-        const cuenta = perfil.cuentas?.[0] ?? null;
+    // 3. Crear un mapa para un acceso rápido a las cuentas por usuario_id
+    const cuentasMap = new Map(cuentas.map(c => [c.usuario_id, c]));
+
+    // 4. Combinar los datos de perfiles y cuentas
+    const clientesConSaldo = perfiles.map(perfil => {
+        const cuenta = cuentasMap.get(perfil.id);
         return {
             id: perfil.id,
             nombre: perfil.nombre_completo,
@@ -1194,7 +1391,9 @@ async function getClientes() {
             cuentaId: cuenta?.id ?? '',
             saldo: cuenta?.saldo_actual ?? 0,
         };
-    });
+    }).sort((a, b) => a.nombre.localeCompare(b.nombre)); // Ordenar alfabéticamente
+
+    return clientesConSaldo;
 }
 
 export default async function ListaAlumnosPage() {
@@ -1407,6 +1606,8 @@ export default function NuevoAlumnoPage() {
 
 ## File: `src/app/admin/page.tsx`
 ```tsx
+// src/app/admin/page.tsx
+
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1414,17 +1615,10 @@ import { createClient } from '@/lib/supabase/server';
 import { formatSoles } from '@/lib/utils';
 import { Users, UserPlus, Banknote, TrendingUp, ArrowRight, DollarSign } from 'lucide-react';
 import { redirect } from 'next/navigation';
-import { Database } from '@/lib/supabase/database.types';
-
-type Profile = Database['public']['Tables']['perfiles']['Row'];
-type Account = Database['public']['Tables']['cuentas']['Row'];
-type ProfileWithAccount = Profile & {
-    cuentas: Pick<Account, 'saldo_actual'>[];
-};
 
 async function getStats() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient();
+
     const { count, error: countError } = await supabase
       .from('perfiles')
       .select('*', { count: 'exact', head: true })
@@ -1435,7 +1629,7 @@ async function getStats() {
     const { data: accounts, error: balanceError } = await supabase.from('cuentas').select('saldo_actual');
     if (balanceError) console.error("Error fetching balances:", balanceError);
     
-  const totalBalance = accounts?.reduce((acc, curr) => acc + (Number(curr.saldo_actual) || 0), 0) ?? 0;
+    const totalBalance = accounts?.reduce((acc, curr) => acc + (Number(curr.saldo_actual) || 0), 0) ?? 0;
     
     return {
         totalStudents: count ?? 0,
@@ -1444,32 +1638,49 @@ async function getStats() {
 }
 
 async function getRecentStudents() {
-    // CORRECCIÓN: Se debe usar await para el cliente de servidor
     const supabase = await createClient();
-    const { data, error } = await supabase
+
+    // 1. Obtener los perfiles de clientes más recientes
+    const { data: perfiles, error: perfilesError } = await supabase
         .from('perfiles')
-        .select(`id, nombre_completo, fecha_creacion, cuentas(saldo_actual)`)
+        .select('*')
         .eq('rol', 'cliente')
         .order('fecha_creacion', { ascending: false })
         .limit(3);
 
-    if (error) {
-        console.error("Error fetching recent students:", error);
+    if (perfilesError) {
+        console.error("Error fetching recent students:", perfilesError);
         return [];
     }
-    
-    const typedData = data as ProfileWithAccount[];
 
-  return typedData.map(profile => ({
-    id: profile.id,
-    nombre: profile.nombre_completo,
-    fechaCreacion: profile.fecha_creacion,
-    saldo: Number(profile.cuentas?.[0]?.saldo_actual) || 0,
-  }));
+    // 2. Obtener las cuentas de esos perfiles
+    const userIds = perfiles.map(p => p.id);
+    const { data: cuentas, error: cuentasError } = await supabase
+        .from('cuentas')
+        .select('*')
+        .in('usuario_id', userIds);
+
+    if (cuentasError) {
+        console.error("Error fetching accounts for recent students:", cuentasError);
+        // Devolver perfiles sin saldo si las cuentas fallan
+        return perfiles.map(p => ({ id: p.id, nombre: p.nombre_completo, fechaCreacion: p.fecha_creacion, saldo: 0 }));
+    }
+
+    const cuentasMap = new Map(cuentas.map(c => [c.usuario_id, c]));
+
+    // 3. Combinar los datos
+    return perfiles.map(perfil => {
+        const cuenta = cuentasMap.get(perfil.id);
+        return {
+            id: perfil.id,
+            nombre: perfil.nombre_completo,
+            fechaCreacion: perfil.fecha_creacion,
+            saldo: cuenta?.saldo_actual ?? 0,
+        };
+    });
 }
 
 export default async function AdminDashboard() {
-  // CORRECCIÓN: Se debe usar await para el cliente de servidor
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
@@ -1544,7 +1755,7 @@ export default async function AdminDashboard() {
                 <div key={student.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div>
                     <p className="font-medium">{student.nombre}</p>
-                    <p className="text-sm text-gray-500">Registrado: {new Date(student.fechaCreacion).toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-500">Registrado: {new Date(student.fechaCreacion).toLocaleDateString('es-PE', { timeZone: 'UTC' })}</p>
                   </div>
                   <p className="font-bold text-chiti_bank-green">{formatSoles(student.saldo)}</p>
                 </div>
@@ -2291,7 +2502,7 @@ _[Skipped: binary or non-UTF8 file]_
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-  /* ChitiBank Custom Variables */
+    /* ChitiBank Custom Variables */
     --chiti_bank-blue: 225 100% 20%; /* #1e3a8a */
     --chiti_bank-green: 142 76% 36%; /* #16a34a */
   }
@@ -2331,7 +2542,13 @@ _[Skipped: binary or non-UTF8 file]_
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family:
+      var(--font-geist-sans),
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
   }
 }
 
@@ -2378,6 +2595,27 @@ _[Skipped: binary or non-UTF8 file]_
 
 .hover\:border-chiti_bank-green:hover {
   border-color: #16a34a !important;
+}
+
+/* Animations */
+.motion-safe-appear {
+  animation: fadeInUp 220ms ease-out both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-ghost {
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
 
 ```
@@ -2761,6 +2999,146 @@ export default function ClientGuard({ children }: { children: React.ReactNode })
 
 ```
 
+## File: `src/components/client-navigation.tsx`
+```tsx
+"use client";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { LogOut, Settings, ShoppingCart, Coffee } from "lucide-react";
+
+export default function ClientNavigation() {
+  const router = useRouter();
+
+  async function handleSignOut() {
+    // dynamic import to avoid server-side issues
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+  }
+
+  return (
+    <header className="bg-white border-b">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="text-lg font-bold">
+              ChitiBank
+            </Link>
+            <nav className="hidden md:flex items-center gap-4">
+              <Link
+                href="/dashboard"
+                className="text-sm text-gray-700 hover:text-gray-900"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/comedor"
+                className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Coffee className="h-4 w-4" /> Comedor
+              </Link>
+              <Link
+                href="/bazar"
+                className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"
+              >
+                <ShoppingCart className="h-4 w-4" /> Bazar
+              </Link>
+            </nav>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/transferir">
+              <Button variant="chiti_bank" size="sm">
+                Nueva Transferencia
+              </Button>
+            </Link>
+            <div className="relative">
+              <details className="relative">
+                <summary className="cursor-pointer text-sm text-gray-700">
+                  Mi Cuenta
+                </summary>
+                <div className="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow-lg z-10">
+                  <Link
+                    href="/perfil/configuracion"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Settings className="h-4 w-4" /> Configuración
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" /> Cerrar sesión
+                  </button>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+```
+
+## File: `src/components/transaction/TransactionLine.tsx`
+```tsx
+import * as React from "react";
+import { formatSoles } from "@/lib/utils";
+
+type Transaction = {
+  id: string;
+  tipo: string;
+  fecha: string;
+  monto: number;
+  descripcion?: string;
+  cuenta_destino_id?: string;
+};
+
+export default function TransactionLine({
+  t,
+  cuentaId,
+}: {
+  t: Transaction;
+  cuentaId: string;
+}) {
+  const incoming = t.cuenta_destino_id === cuentaId;
+
+  return (
+    <div className="flex items-center justify-between py-3 border-b last:border-b-0 transition-transform transform hover:translate-y-0.5 motion-reduce:transform-none">
+      <div className="flex items-center gap-3">
+        <div
+          className={`h-10 w-10 rounded-full flex items-center justify-center ${incoming ? "bg-green-100" : "bg-red-100"}`}
+        >
+          <span
+            className={`text-sm font-semibold ${incoming ? "text-green-700" : "text-red-700"}`}
+          >
+            {t.tipo?.charAt(0)?.toUpperCase() ?? "?"}
+          </span>
+        </div>
+        <div>
+          <p className="font-medium capitalize">{t.tipo.replace("_", " ")}</p>
+          <p className="text-xs text-gray-500">
+            {new Date(t.fecha).toLocaleString("es-PE")}
+          </p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p
+          className={`font-semibold ${incoming ? "text-green-600" : "text-red-600"}`}
+        >
+          {incoming ? "+" : "-"} {formatSoles(t.monto)}
+        </p>
+        <p className="text-xs text-gray-500">{t.descripcion || ""}</p>
+      </div>
+    </div>
+  );
+}
+
+```
+
 ## File: `src/components/ui/alert.tsx`
 ```tsx
 import * as React from "react"
@@ -2890,24 +3268,28 @@ export { Button, buttonVariants }
 
 ## File: `src/components/ui/card.tsx`
 ```tsx
-import * as React from "react"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
+
+type CardVariant = "default" | "ghost" | "solid";
 
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
-      className
-    )}
-    {...props}
-  />
-))
-Card.displayName = "Card"
+  React.HTMLAttributes<HTMLDivElement> & { variant?: CardVariant }
+>(({ className, variant = "default", ...props }, ref) => {
+  const base = "rounded-xl border bg-card text-card-foreground";
+  const variantClass =
+    variant === "ghost"
+      ? "bg-transparent shadow-none border-transparent"
+      : variant === "solid"
+        ? "shadow-lg"
+        : "shadow";
+  return (
+    <div ref={ref} className={cn(base, variantClass, className)} {...props} />
+  );
+});
+Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<
   HTMLDivElement,
@@ -2918,8 +3300,8 @@ const CardHeader = React.forwardRef<
     className={cn("flex flex-col space-y-1.5 p-6", className)}
     {...props}
   />
-))
-CardHeader.displayName = "CardHeader"
+));
+CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef<
   HTMLDivElement,
@@ -2930,8 +3312,8 @@ const CardTitle = React.forwardRef<
     className={cn("font-semibold leading-none tracking-tight", className)}
     {...props}
   />
-))
-CardTitle.displayName = "CardTitle"
+));
+CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef<
   HTMLDivElement,
@@ -2942,16 +3324,16 @@ const CardDescription = React.forwardRef<
     className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
-))
-CardDescription.displayName = "CardDescription"
+));
+CardDescription.displayName = "CardDescription";
 
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
-))
-CardContent.displayName = "CardContent"
+));
+CardContent.displayName = "CardContent";
 
 const CardFooter = React.forwardRef<
   HTMLDivElement,
@@ -2962,10 +3344,17 @@ const CardFooter = React.forwardRef<
     className={cn("flex items-center p-6 pt-0", className)}
     {...props}
   />
-))
-CardFooter.displayName = "CardFooter"
+));
+CardFooter.displayName = "CardFooter";
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+};
 
 ```
 
