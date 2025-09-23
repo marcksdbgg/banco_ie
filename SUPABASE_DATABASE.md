@@ -136,9 +136,55 @@ Archivos relevantes en el repo
 - `supabase/functions/*` — Edge Functions: `crear-usuario-cliente`, `gestionar-fondos`, `iniciar-transferencia-cliente`.
 
 Apéndice: Resultados SQL crudos
-------------------------------
-- Listado de tablas: `perfiles`, `transacciones`, `cuentas`.
-- Columnas por tabla: (ver sección "Esquema público"), extraído de information_schema.
-- Constraints: PKs, FKs, UNIQUEs y CHECKs detectados; ver secciones anteriores.
-- Routines detectadas: `realizar_movimiento`, `realizar_transferencia` (definiciones detectadas y resumidas).
+
+## Apéndice: Esquema de Amistades y Notificaciones (Feature: Friends)
+
+4) Tabla `amistades`
+- Columnas
+  - `id`: bigint, PK
+  - `usuario_solicitante_id`: uuid, FK -> `perfiles(id)` (quien envía la solicitud)
+  - `usuario_receptor_id`: uuid, FK -> `perfiles(id)` (quien recibe la solicitud)
+  - `estado`: text, NOT NULL, DEFAULT `'pendiente'` (valores: 'pendiente', 'aceptada', 'bloqueada')
+  - `fecha_solicitud`: timestamptz
+  - `fecha_actualizacion`: timestamptz
+- Constraints notables
+  - `unique_friendship_pair`: Previene registros duplicados entre dos usuarios.
+
+5) Tabla `notificaciones`
+- Columnas
+  - `id`: bigint, PK
+  - `usuario_id`: uuid, FK -> `perfiles(id)` (dueño de la notificación)
+  - `tipo`: text, NOT NULL (ej: 'solicitud_amistad')
+  - `mensaje`: text, NOT NULL
+  - `enlace`: text, NULLABLE (ej: '/dashboard/amigos')
+  - `leida`: boolean, DEFAULT `false`
+  - `fecha_creacion`: timestamptz
+
+### Edge Functions (Nuevas)
+- `solicitar-amistad/index.ts`
+  - Autentica al usuario, busca al destinatario por número de cuenta, y crea una solicitud de amistad en estado 'pendiente'. También crea una notificación para el receptor.
+- `gestionar-amistad/index.ts`
+  - Un endpoint unificado para que los usuarios acepten, rechacen o eliminen amistades. Valida que el usuario que realiza la acción esté autorizado para hacerlo.
+
+### Privacy, Testing, and Rollout Strategy
+**Privacy Settings:** Para una implementación mínima, se omiten controles de privacidad detallados. Una mejora futura podría agregar una columna a la tabla perfiles (por ejemplo, permitir_solicitudes_amistad BOOLEAN) para que los usuarios puedan rechazar solicitudes.
+
+**Testing:**
+- Manual: Crear dos cuentas de prueba. Usuario A envía solicitud a Usuario B. Usuario B recibe notificación y acepta. Ambos deben verse como amigos. Probar también la función Eliminar.
+- Automatizado (futuro): Escribir tests de integración para las Edge Functions usando herramientas de Supabase.
+
+**Monitoring:** Monitorear los logs de ejecución de las nuevas Edge Functions en el dashboard de Supabase.
+
+**Rollout con Feature Flags:**
+Implementar un flag en las variables de entorno, por ejemplo: NEXT_PUBLIC_FEATURE_FRIENDS_ENABLED=true.
+En el archivo src/components/client-navigation.tsx, renderizar condicionalmente el link "Amigos":
+
+```tsx
+{process.env.NEXT_PUBLIC_FEATURE_FRIENDS_ENABLED === 'true' && (
+    <Link href="/dashboard/amigos" ...>
+        <Users className="h-4 w-4" /> Amigos
+    </Link>
+)}
+```
+Esto permite desplegar el código sin exponer la funcionalidad hasta que esté lista. Para activarla, basta con setear la variable y redeplegar.
 

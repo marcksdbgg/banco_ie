@@ -2,6 +2,7 @@
 
 ```
 banco_ie/
+├── .env.local
 ├── .gitignore
 ├── SUPABASE_DATABASE.md
 ├── errores
@@ -27,6 +28,8 @@ banco_ie/
 │   │   │   ├── comedor
 │   │   │   │   └── page.tsx
 │   │   │   ├── dashboard
+│   │   │   │   ├── amigos
+│   │   │   │   │   └── page.tsx
 │   │   │   │   ├── page.tsx
 │   │   │   │   └── transferir
 │   │   │   │       └── page.tsx
@@ -93,13 +96,19 @@ banco_ie/
 │   │   │   └── index.ts
 │   │   ├── crear-usuario-cliente
 │   │   │   └── index.ts
+│   │   ├── gestionar-amistad
+│   │   │   └── index.ts
 │   │   ├── gestionar-fondos
 │   │   │   └── index.ts
-│   │   └── iniciar-transferencia-cliente
+│   │   ├── iniciar-transferencia-cliente
+│   │   │   └── index.ts
+│   │   └── solicitar-amistad
 │   │       └── index.ts
 │   └── migrations
 │       ├── 001_create_numero_cuenta_seq_and_function.sql
-│       └── 002_add_tipo_to_perfiles_and_constraints.sql
+│       ├── 002_add_tipo_to_perfiles_and_constraints.sql
+│       ├── 003_create_friends_and_notifications.sql
+│       └── 003_fix_rol_backfill_and_constraint.sql
 ├── tailwind.config.ts
 └── tsconfig.json
 ```
@@ -125,7 +134,7 @@ banco_ie/
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.468.0",
-    "next": "15.3.4",
+    "next": "^15.5.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^2.5.0"
@@ -142,6 +151,7 @@ banco_ie/
     "typescript": "^5"
   }
 }
+
 ```
 
 ## File: `tsconfig.json`
@@ -174,6 +184,12 @@ banco_ie/
   "exclude": ["node_modules", "supabase/functions/**"]
 }
 
+```
+
+## File: `.env.local`
+```local
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 ## File: `.gitignore`
@@ -219,155 +235,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-```
-
-## File: `SUPABASE_DATABASE.md`
-```md
-# Documentación de la Base de Datos Supabase (proyecto: banco_ie)
-
-Fecha: 13/09/2025
-
-Resumen
--------
-Este documento describe el esquema de la base de datos `public` del proyecto Supabase `banco_ie`, las tablas principales, columnas, restricciones, índices, funciones (RPC), y cómo la aplicación realiza la autenticación y usa las keys (anon/service-role) en las edge functions.
-
-Contenido
-- Resumen del esquema
-- Tablas: `perfiles`, `cuentas`, `transacciones` (columnas, tipos, defaults)
-- Constraints: PK, FKs, UNIQUE, CHECK
-- Índices
-- Funciones/RPC en la base de datos: `realizar_transferencia` (y otras detectadas)
-- Edge Functions en `supabase/functions`
-- Autenticación y configuración (según `supabase/config.toml` y uso en el código)
-- Recomendaciones de seguridad y mejoras
-
-Esquema público
----------------
-Tablas detectadas en `public`:
-- perfiles
-- cuentas
-- transacciones
-
-1) Tabla `cuentas`
-- Columnas
-  - `id` : uuid, NOT NULL, DEFAULT `gen_random_uuid()` (PK)
-  - `usuario_id` : uuid, NOT NULL, FK -> `perfiles(id)`, UNIQUE
-  - `numero_cuenta` : text, NOT NULL, UNIQUE
-  - `saldo_actual` : numeric, NOT NULL, DEFAULT `0.00`
-  - `fecha_apertura` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
-
-- Constraints notables
-  - `cuentas_pkey` (PRIMARY KEY on `id`)
-  - `cuentas_usuario_id_fkey` (FOREIGN KEY `usuario_id` -> `perfiles(id)`)
-  - `cuentas_usuario_id_key` (UNIQUE on `usuario_id`)
-  - `cuentas_numero_cuenta_key` (UNIQUE on `numero_cuenta`)
-  - `saldo_no_negativo` (CHECK constraint enforcing saldo no negativo)
-  - Varios NOT NULL check constraints generados automáticamente por Postgres for NOT NULL columns
-
-- Índices
-  - `cuentas_pkey` (b-tree on `id`)
-  - `cuentas_usuario_id_key` (unique b-tree on `usuario_id`)
-  - `cuentas_numero_cuenta_key` (unique b-tree on `numero_cuenta`)
-
-2) Tabla `perfiles`
-- Columnas
-  - `id` : uuid, NOT NULL (PK)
-  - `nombre_completo` : text, NOT NULL
-  - `rol` : text, NOT NULL, DEFAULT `'cliente'`::text
-  - `fecha_creacion` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
-
-- Constraints
-  - `perfiles_pkey` (PRIMARY KEY on `id`)
-  - `perfiles_id_fkey` (FOREIGN KEY `id` -> `users(id)`?) - NOTE: There is an FK referencing `users` inferred in the typed file. In the DB inspection, `perfiles_id_fkey` exists but referenced table may be part of `auth` schema; the typed db file shows relation to `users(id)` (auth.users)
-  - `rol_valido` (CHECK constraint to validate `rol` values)
-
-- Índices
-  - `perfiles_pkey` (b-tree on `id`)
-
-3) Tabla `transacciones`
-- Columnas
-  - `id` : bigint, NOT NULL (PK)
-  - `cuenta_origen_id` : uuid, NULLABLE, FK -> `cuentas(id)`
-  - `cuenta_destino_id` : uuid, NULLABLE, FK -> `cuentas(id)`
-  - `monto` : numeric, NOT NULL
-  - `tipo` : text, NOT NULL (ej: 'deposito', 'retiro', 'transferencia')
-  - `descripcion` : text, NULLABLE
-  - `fecha` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
-
-- Constraints
-  - `transacciones_pkey` (PRIMARY KEY on `id`)
-  - `transacciones_cuenta_origen_id_fkey` (FOREIGN KEY -> `cuentas(id)`)
-  - `transacciones_cuenta_destino_id_fkey` (FOREIGN KEY -> `cuentas(id)`)
-  - `monto_positivo` (CHECK enforcing monto > 0)
-  - `origen_o_destino_requerido` (CHECK ensuring origen o destino presente)
-  - `tipo_transaccion_valido` (CHECK enforcing valid `tipo` values)
-
-- Índices
-  - `transacciones_pkey` (b-tree on `id`)
-
-Funciones/RPC en la base de datos
----------------------------------
-Se detectaron rutinas en el esquema `public`:
-
-1) `realizar_transferencia(cuenta_origen_id_param uuid, numero_cuenta_destino_param text, monto_param numeric) RETURNS void`
-- Comportamiento (resumen):
-  - Verifica que quien ejecuta tiene permiso (usa `auth.uid()` para validar propietario de `cuenta_origen_id_param`).
-  - Busca la `cuenta_destino` por `numero_cuenta_destino_param` con `FOR UPDATE`.
-  - Verifica que la cuenta destino existe y que no es la misma que la origen.
-  - Verifica saldo suficiente en la cuenta origen.
-  - Actualiza `saldo_actual` restando y sumando en origen/destino (bloqueando filas para concurrencia).
-  - Inserta una fila en `transacciones` con tipo `'transferencia'` y una descripción automatizada.
-  - Lanza excepción con mensajes claros en caso de error (cuenta inexistente, saldo insuficiente, permiso denegado).
-
-2) `realizar_movimiento(...) RETURNS boolean` (se detectó otra función con nombre `realizar_movimiento`, que maneja retiros/depositos/transferencias) -- definición parcial detectada.
-- Nota: `realizar_movimiento` parece ser una versión anterior o auxiliar. Documentar con precaución y revisar código si se usa.
-
-Edge Functions (carpeta `supabase/functions`)
-----------------------------------------------
-En el repo existe una carpeta `supabase/functions` con las siguientes funciones:
-- `crear-usuario-cliente/index.ts` (Edge Function Deno)
-  - Usa `SUPABASE_SERVICE_ROLE_KEY` y `SUPABASE_URL` para crear usuarios vía `supabaseAdmin.auth.admin.createUser`, inserta en `perfiles`, crea `cuentas` y registra `transacciones` si `saldo_inicial > 0`.
-  - Genera `numero_cuenta` aleatorio de 10 dígitos.
-  - CORS habilitado con cabeceras en `_shared/cors.ts`.
-
-- `gestionar-fondos/index.ts`
-  - Usa `SUPABASE_SERVICE_ROLE_KEY` para modificar saldos (depósito/retiro) y registrar transacciones.
-  - Nota: TODO en código para verificar que quien llama es admin.
-
-- `iniciar-transferencia-cliente/index.ts`
-  - Usa `SUPABASE_ANON_KEY` junto con el header Authorization del request para autenticar al usuario (usa `supabase.auth.getUser()`)
-  - Encuentra la cuenta del usuario (por `usuario_id`) y llama al RPC `realizar_transferencia` con `rpc`.
-
-Autenticación y configuración
------------------------------
-- `supabase/config.toml` indica `auth.enabled = true` y configuración local (jwt_expiry, enable_signup = true, etc.).
-- El código del frontend/server crea clientes Supabase:
-  - `src/lib/supabase/client.ts` usa `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` para el cliente de navegador.
-  - `src/lib/supabase/server.ts` usa también `NEXT_PUBLIC_SUPABASE_ANON_KEY` y maneja cookies para sesiones en Server Components.
-- Edge Functions:
-  - `crear-usuario-cliente` y `gestionar-fondos` usan `SUPABASE_SERVICE_ROLE_KEY` (privilegiada) para operaciones administrativas.
-  - `iniciar-transferencia-cliente` usa `SUPABASE_ANON_KEY` pero reenvía la cabecera `Authorization` para que `supabase.auth.getUser()` resuelva el usuario autenticado.
-
-RLS (Row Level Security) y políticas
------------------------------------
-- NO HAY RLS, SERÁ IMPLEMENTADO A FUTURO.
-
-Archivos relevantes en el repo
-------------------------------
-- `src/lib/supabase/database.types.ts` — tipado generado que refleja las tablas `cuentas`, `perfiles`, `transacciones` y la función `realizar_transferencia`.
-- `src/lib/supabase/client.ts` — creación de cliente browser.
-- `src/lib/supabase/server.ts` — creación de cliente server con cookies.
-- `supabase/config.toml` — configuración local de supabase (auth, api, ports, etc.).
-- `supabase/functions/*` — Edge Functions: `crear-usuario-cliente`, `gestionar-fondos`, `iniciar-transferencia-cliente`.
-
-Apéndice: Resultados SQL crudos
-------------------------------
-- Listado de tablas: `perfiles`, `transacciones`, `cuentas`.
-- Columnas por tabla: (ver sección "Esquema público"), extraído de information_schema.
-- Constraints: PKs, FKs, UNIQUEs y CHECKs detectados; ver secciones anteriores.
-- Routines detectadas: `realizar_movimiento`, `realizar_transferencia` (definiciones detectadas y resumidas).
-
 
 ```
 
@@ -517,6 +384,7 @@ if __name__ == "__main__":
 ```ts
 /// <reference types="next" />
 /// <reference types="next/image-types/global" />
+/// <reference path="./.next/types/routes.d.ts" />
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
@@ -545,9 +413,9 @@ export default config;
 
 ```
 
-## File: `public/chitibank-logo.jpeg`
+## File: `public\chitibank-logo.jpeg`
 _[Skipped: binary or non-UTF8 file]_
-## File: `public/empty-transactions.svg`
+## File: `public\empty-transactions.svg`
 ```svg
 <svg width="160" height="160" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <rect width="24" height="24" rx="4" fill="#f3f4f6"/>
@@ -557,32 +425,32 @@ _[Skipped: binary or non-UTF8 file]_
 </svg>
 ```
 
-## File: `public/file.svg`
+## File: `public\file.svg`
 ```svg
 <svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
 ```
 
-## File: `public/globe.svg`
+## File: `public\globe.svg`
 ```svg
 <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
 ```
 
-## File: `public/next.svg`
+## File: `public\next.svg`
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
 ```
 
-## File: `public/vercel.svg`
+## File: `public\vercel.svg`
 ```svg
 <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
 ```
 
-## File: `public/window.svg`
+## File: `public\window.svg`
 ```svg
 <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
 ```
 
-## File: `src/app/(cliente)/bazar/page.tsx`
+## File: `src\app\(cliente)\bazar\page.tsx`
 ```tsx
 import Link from "next/link";
 
@@ -618,7 +486,7 @@ export default function BazarPage() {
 
 ```
 
-## File: `src/app/(cliente)/comedor/page.tsx`
+## File: `src\app\(cliente)\comedor\page.tsx`
 ```tsx
 import Link from "next/link";
 
@@ -654,7 +522,196 @@ export default function ComedorPage() {
 
 ```
 
-## File: `src/app/(cliente)/dashboard/page.tsx`
+## File: `src\app\(cliente)\dashboard\amigos\page.tsx`
+```tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { UserPlus, Loader2, AlertCircle, CheckCircle, X, Check } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
+
+type Amistad = {
+    id: number;
+    estado: 'pendiente' | 'aceptada';
+    solicitante: { id: string; nombre_completo: string; };
+    receptor: { id: string; nombre_completo: string; };
+};
+
+export default function AmigosPage() {
+    const [user, setUser] = useState<User | null>(null);
+    const [amistades, setAmistades] = useState<Amistad[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [numeroCuenta, setNumeroCuenta] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const supabase = createClient();
+
+    const fetchAmistades = async (userId: string) => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('amistades')
+            .select(`
+                id,
+                estado,
+                solicitante:usuario_solicitante_id ( id, nombre_completo ),
+                receptor:usuario_receptor_id ( id, nombre_completo )
+            `)
+            .or(`usuario_solicitante_id.eq.${userId},usuario_receptor_id.eq.${userId}`)
+            .order('fecha_solicitud', { ascending: false });
+
+        if (error) {
+            setError('Error al cargar la lista de amigos.');
+            console.error(error);
+        } else {
+            // Fix: map arrays to single objects
+            const amistades = (data as any[] || []).map(a => ({
+                id: a.id,
+                estado: a.estado,
+                solicitante: Array.isArray(a.solicitante) ? a.solicitante[0] : a.solicitante,
+                receptor: Array.isArray(a.receptor) ? a.receptor[0] : a.receptor,
+            }));
+            setAmistades(amistades);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        const init = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUser(user);
+                fetchAmistades(user.id);
+            }
+        };
+        init();
+    }, []);
+
+    const handleAddFriend = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        setError('');
+        setSuccess('');
+
+        const { data, error } = await supabase.functions.invoke('solicitar-amistad', {
+            body: { numero_cuenta_amigo: numeroCuenta },
+        });
+        
+        if (error || data?.error) {
+            setError(data?.error || error.message);
+        } else {
+            setSuccess(data.message);
+            setNumeroCuenta('');
+            if (user) fetchAmistades(user.id);
+        }
+        setIsSubmitting(false);
+    };
+    
+    const handleManageRequest = async (amistad_id: number, accion: 'aceptar' | 'rechazar' | 'eliminar') => {
+        const { data, error } = await supabase.functions.invoke('gestionar-amistad', {
+            body: { amistad_id, accion },
+        });
+
+        if (error || data?.error) {
+            setError(data?.error || error.message);
+        } else {
+            setSuccess(data.message);
+            if (user) fetchAmistades(user.id);
+        }
+    };
+    
+    if (loading) return <div>Cargando...</div>;
+    if (!user) return <div>No autenticado.</div>
+
+    const amigosAceptados = amistades.filter(a => a.estado === 'aceptada');
+    const solicitudesRecibidas = amistades.filter(a => a.estado === 'pendiente' && a.receptor.id === user.id);
+    const solicitudesEnviadas = amistades.filter(a => a.estado === 'pendiente' && a.solicitante.id === user.id);
+
+    return (
+        <div className="space-y-6">
+            <h1 className="text-3xl font-bold">Mis Amigos</h1>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center"><UserPlus className="mr-2" />Añadir Amigo</CardTitle>
+                    <CardDescription>Ingresa el número de cuenta de 10 dígitos de tu amigo para enviarle una solicitud.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleAddFriend} className="flex items-end gap-4">
+                        <div className="flex-grow">
+                            <Label htmlFor="numero-cuenta">Número de Cuenta</Label>
+                            <Input id="numero-cuenta" value={numeroCuenta} onChange={e => setNumeroCuenta(e.target.value)} placeholder="1234567890" required />
+                        </div>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Enviar Solicitud'}
+                        </Button>
+                    </form>
+                    {error && <Alert variant="destructive" className="mt-4"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+                    {success && <Alert variant="default" className="mt-4 bg-green-50 border-green-200"><CheckCircle className="h-4 w-4" /><AlertTitle>Éxito</AlertTitle><AlertDescription>{success}</AlertDescription></Alert>}
+                </CardContent>
+            </Card>
+
+            {solicitudesRecibidas.length > 0 && (
+                <Card>
+                    <CardHeader><CardTitle>Solicitudes de Amistad Recibidas</CardTitle></CardHeader>
+                    <CardContent>
+                        {solicitudesRecibidas.map(req => (
+                            <div key={req.id} className="flex items-center justify-between p-2 border-b">
+                                <span>{req.solicitante.nombre_completo}</span>
+                                <div className="flex gap-2">
+                                    <Button size="icon" variant="outline" className="text-green-600" onClick={() => handleManageRequest(req.id, 'aceptar')}><Check /></Button>
+                                    <Button size="icon" variant="destructive" onClick={() => handleManageRequest(req.id, 'rechazar')}><X /></Button>
+                                </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
+
+            <Card>
+                <CardHeader><CardTitle>Lista de Amigos ({amigosAceptados.length})</CardTitle></CardHeader>
+                <CardContent>
+                    {amigosAceptados.length > 0 ? (
+                        amigosAceptados.map(amigo => {
+                            const amigoInfo = amigo.solicitante.id === user.id ? amigo.receptor : amigo.solicitante;
+                            return (
+                                <div key={amigo.id} className="flex items-center justify-between p-2 border-b">
+                                    <span>{amigoInfo.nombre_completo}</span>
+                                    <Button size="sm" variant="destructive" onClick={() => handleManageRequest(amigo.id, 'eliminar')}>Eliminar</Button>
+                                </div>
+                            );
+                        })
+                    ) : <p className="text-gray-500">Aún no tienes amigos. ¡Añade uno!</p>}
+                </CardContent>
+            </Card>
+
+            {solicitudesEnviadas.length > 0 && (
+                 <Card>
+                    <CardHeader><CardTitle>Solicitudes Enviadas Pendientes</CardTitle></CardHeader>
+                    <CardContent>
+                        {solicitudesEnviadas.map(req => (
+                            <div key={req.id} className="flex items-center justify-between p-2 border-b">
+                                <span>{req.receptor.nombre_completo}</span>
+                                <span className="text-sm text-gray-500">Pendiente</span>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+}
+
+```
+
+## File: `src\app\(cliente)\dashboard\page.tsx`
 ```tsx
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -887,7 +944,7 @@ export default async function DashboardPage() {
 
 ```
 
-## File: `src/app/(cliente)/dashboard/transferir/page.tsx`
+## File: `src\app\(cliente)\dashboard\transferir\page.tsx`
 ```tsx
 'use client';
 
@@ -1027,7 +1084,7 @@ export default function TransferPage() {
 }
 ```
 
-## File: `src/app/(cliente)/layout.tsx`
+## File: `src\app\(cliente)\layout.tsx`
 ```tsx
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -1063,7 +1120,7 @@ export default async function ClienteLayout({
 
 ```
 
-## File: `src/app/admin/configuracion/page.tsx`
+## File: `src\app\admin\configuracion\page.tsx`
 ```tsx
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -1104,7 +1161,7 @@ export default async function ConfiguracionPage() {
 }
 ```
 
-## File: `src/app/admin/layout.tsx`
+## File: `src\app\admin\layout.tsx`
 ```tsx
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
@@ -1119,7 +1176,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect('/auth/login');
 
   const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).maybeSingle();
-  if (!perfil || !['personal', 'admin'].includes(perfil.rol)) redirect('/auth/login');
+  // Only 'admin' role should have access to this layout. 'personal' is a tipo, not a role.
+  if (!perfil || perfil.rol !== 'admin') redirect('/auth/login');
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -1133,7 +1191,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
 ```
 
-## File: `src/app/admin/lista-alumnos/page-client.tsx`
+## File: `src\app\admin\lista-alumnos\page-client.tsx`
 ```tsx
 // src/app/admin/lista-alumnos/page-client.tsx
 
@@ -1345,7 +1403,7 @@ export default function AlumnosClient({ initialAlumnos }: AlumnosClientProps) {
 }
 ```
 
-## File: `src/app/admin/lista-alumnos/page.tsx`
+## File: `src\app\admin\lista-alumnos\page.tsx`
 ```tsx
 // src/app/admin/lista-alumnos/page.tsx
 
@@ -1408,7 +1466,7 @@ export default async function ListaAlumnosPage() {
 }
 ```
 
-## File: `src/app/admin/nuevo-alumno/page.tsx`
+## File: `src\app\admin\nuevo-alumno\page.tsx`
 ```tsx
 // src/app/admin/nuevo-alumno/page.tsx
 
@@ -1434,7 +1492,7 @@ export default function NuevoAlumnoPage() {
     email: '',
     password: '',
     montoInicial: '0',
-    rol: 'alumno', // 'rol' aquí se usa para el tipo de perfil en la UI
+    tipo: 'alumno', // 'tipo' aquí representa alumno|padre|personal
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -1481,8 +1539,10 @@ export default function NuevoAlumnoPage() {
           password: formData.password,
           saldo_inicial: parseFloat(formData.montoInicial),
           // Mapeo correcto de rol y tipo para la base de datos
-          rol: formData.rol === 'personal' ? 'personal' : 'cliente',
-          tipo: formData.rol, // 'alumno', 'padre', o 'personal'
+          // Always set the system role to 'cliente' when creating client users from the admin panel.
+          rol: 'cliente',
+          // The 'tipo' column stores the kind of client: 'alumno', 'padre', or 'personal'.
+          tipo: formData.tipo, 
         },
       });
 
@@ -1580,7 +1640,7 @@ export default function NuevoAlumnoPage() {
 
             <div className="space-y-2">
               <Label htmlFor="rol">Tipo de Perfil</Label>
-              <select id="rol" name="rol" value={formData.rol} onChange={handleInputChange} className="w-full border rounded p-2 bg-white text-sm">
+              <select id="tipo" name="tipo" value={formData.tipo} onChange={handleInputChange} className="w-full border rounded p-2 bg-white text-sm">
                 <option value="alumno">Alumno</option>
                 <option value="padre">Padre de Familia</option>
                 <option value="personal">Personal de la IE</option>
@@ -1604,7 +1664,7 @@ export default function NuevoAlumnoPage() {
 }
 ```
 
-## File: `src/app/admin/page.tsx`
+## File: `src\app\admin\page.tsx`
 ```tsx
 // src/app/admin/page.tsx
 
@@ -1773,7 +1833,7 @@ export default async function AdminDashboard() {
 }
 ```
 
-## File: `src/app/api/drive-scrape/route.ts`
+## File: `src\app\api\drive-scrape\route.ts`
 ```ts
 import { NextResponse } from 'next/server';
 
@@ -1867,7 +1927,7 @@ export async function GET(request: Request) {
 
 ```
 
-## File: `src/app/auth/auth-code-error/page.tsx`
+## File: `src\app\auth\auth-code-error\page.tsx`
 ```tsx
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
@@ -1904,7 +1964,7 @@ export default function AuthErrorPage() {
 
 ```
 
-## File: `src/app/auth/confirm/route.ts`
+## File: `src\app\auth\confirm\route.ts`
 ```ts
 import { type EmailOtpType } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -1935,7 +1995,7 @@ export async function GET(request: NextRequest) {
 }
 ```
 
-## File: `src/app/auth/login/page.tsx`
+## File: `src\app\auth\login\page.tsx`
 ```tsx
 'use client';
 
@@ -2091,7 +2151,7 @@ export default function LoginPage() {
 }
 ```
 
-## File: `src/app/auth/register/page.tsx`
+## File: `src\app\auth\register\page.tsx`
 ```tsx
 // src/app/auth/register/page.tsx
 
@@ -2297,7 +2357,7 @@ export default function RegisterPage() {
 }
 ```
 
-## File: `src/app/documentos/page.tsx`
+## File: `src\app\documentos\page.tsx`
 ```tsx
 'use client';
 
@@ -2468,9 +2528,9 @@ export default function DocumentosPage() {
 
 ```
 
-## File: `src/app/favicon.ico`
+## File: `src\app\favicon.ico`
 _[Skipped: binary or non-UTF8 file]_
-## File: `src/app/globals.css`
+## File: `src\app\globals.css`
 ```css
 @import "tailwindcss";
 
@@ -2620,7 +2680,7 @@ _[Skipped: binary or non-UTF8 file]_
 
 ```
 
-## File: `src/app/layout.tsx`
+## File: `src\app\layout.tsx`
 ```tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -2658,7 +2718,7 @@ export default function RootLayout({
 
 ```
 
-## File: `src/app/page.tsx`
+## File: `src\app\page.tsx`
 ```tsx
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -2802,7 +2862,7 @@ export default function Home() {
 
 ```
 
-## File: `src/components/admin-guard.tsx`
+## File: `src\components\admin-guard.tsx`
 ```tsx
 'use client';
 
@@ -2857,7 +2917,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
 ```
 
-## File: `src/components/admin-navigation.tsx`
+## File: `src\components\admin-navigation.tsx`
 ```tsx
 "use client";
 
@@ -2887,7 +2947,7 @@ export function AdminNavigation() {
         },
         {
             href: "/admin/lista-alumnos",
-            label: "Alumnos",
+            label: "Clientes",
             icon: Users,
         },
         {
@@ -2947,7 +3007,7 @@ export function AdminNavigation() {
 }
 ```
 
-## File: `src/components/client-guard.tsx`
+## File: `src\components\client-guard.tsx`
 ```tsx
 'use client';
 
@@ -2999,13 +3059,13 @@ export default function ClientGuard({ children }: { children: React.ReactNode })
 
 ```
 
-## File: `src/components/client-navigation.tsx`
+## File: `src\components\client-navigation.tsx`
 ```tsx
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LogOut, Settings, ShoppingCart, Coffee } from "lucide-react";
+import { LogOut, Settings, ShoppingCart, Coffee, Users } from "lucide-react";
 
 export default function ClientNavigation() {
   const router = useRouter();
@@ -3045,6 +3105,12 @@ export default function ClientNavigation() {
               >
                 <ShoppingCart className="h-4 w-4" /> Bazar
               </Link>
+              <Link
+                href="/dashboard/amigos"
+                className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Users className="h-4 w-4" /> Amigos
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">
@@ -3083,7 +3149,7 @@ export default function ClientNavigation() {
 
 ```
 
-## File: `src/components/transaction/TransactionLine.tsx`
+## File: `src\components\transaction\TransactionLine.tsx`
 ```tsx
 import * as React from "react";
 import { formatSoles } from "@/lib/utils";
@@ -3139,7 +3205,7 @@ export default function TransactionLine({
 
 ```
 
-## File: `src/components/ui/alert.tsx`
+## File: `src\components\ui\alert.tsx`
 ```tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -3203,7 +3269,7 @@ export { Alert, AlertTitle, AlertDescription }
 
 ```
 
-## File: `src/components/ui/button.tsx`
+## File: `src\components\ui\button.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3266,7 +3332,7 @@ export { Button, buttonVariants }
 
 ```
 
-## File: `src/components/ui/card.tsx`
+## File: `src\components\ui\card.tsx`
 ```tsx
 import * as React from "react";
 
@@ -3358,7 +3424,7 @@ export {
 
 ```
 
-## File: `src/components/ui/dialog.tsx`
+## File: `src\components\ui\dialog.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3471,7 +3537,7 @@ export {
 
 ```
 
-## File: `src/components/ui/input.tsx`
+## File: `src\components\ui\input.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3499,7 +3565,7 @@ export { Input }
 
 ```
 
-## File: `src/components/ui/label.tsx`
+## File: `src\components\ui\label.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3524,7 +3590,7 @@ export { Label }
 
 ```
 
-## File: `src/components/ui/table.tsx`
+## File: `src\components\ui\table.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3649,7 +3715,7 @@ export {
 
 ```
 
-## File: `src/lib/supabase/client.ts`
+## File: `src\lib\supabase\client.ts`
 ```ts
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -3663,9 +3729,9 @@ export function createClient() {
 
 ```
 
-## File: `src/lib/supabase/database.types.ts`
+## File: `src\lib\supabase\database.types.ts`
 _[Skipped: binary or non-UTF8 file]_
-## File: `src/lib/supabase/middleware.ts`
+## File: `src\lib\supabase\middleware.ts`
 ```ts
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
@@ -3729,7 +3795,7 @@ export async function updateSession(request: NextRequest) {
 }
 ```
 
-## File: `src/lib/supabase/op_atomicas.db`
+## File: `src\lib\supabase\op_atomicas.db`
 ```db
 -- Función para realizar transferencias de manera segura y atómica
 CREATE OR REPLACE FUNCTION public.realizar_transferencia(
@@ -3784,7 +3850,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-## File: `src/lib/supabase/server.ts`
+## File: `src\lib\supabase\server.ts`
 ```ts
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -3825,7 +3891,7 @@ export const createClient = async () => {
 
 ```
 
-## File: `src/lib/utils.ts`
+## File: `src\lib\utils.ts`
 ```ts
 // src/lib/utils.ts
 
@@ -3847,7 +3913,7 @@ export function formatSoles(amount: number | string | null | undefined): string 
 }
 ```
 
-## File: `src/middleware.ts`
+## File: `src\middleware.ts`
 ```ts
 import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
@@ -3871,7 +3937,7 @@ export const config = {
 
 ```
 
-## File: `supabase/.gitignore`
+## File: `supabase\.gitignore`
 ```
 # Supabase
 .branches
@@ -3884,7 +3950,7 @@ export const config = {
 
 ```
 
-## File: `supabase/config.toml`
+## File: `supabase\config.toml`
 ```toml
 # For detailed configuration reference documentation, visit:
 # https://supabase.com/docs/guides/local-development/cli/config
@@ -4179,7 +4245,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 ```
 
-## File: `supabase/functions/_shared/cors.ts`
+## File: `supabase\functions\_shared\cors.ts`
 ```ts
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -4190,7 +4256,7 @@ export const corsHeaders = {
 
 ```
 
-## File: `supabase/functions/borrar-usuario-cliente/index.ts`
+## File: `supabase\functions\borrar-usuario-cliente\index.ts`
 ```ts
 // supabase/functions/borrar-usuario-cliente/index.ts
 
@@ -4281,7 +4347,7 @@ serve(async (req: Request) => {
 });
 ```
 
-## File: `supabase/functions/crear-usuario-cliente/index.ts`
+## File: `supabase\functions\crear-usuario-cliente\index.ts`
 ```ts
 // supabase/functions/crear-usuario-cliente/index.ts
 
@@ -4322,7 +4388,7 @@ serve(async (req: Request) => {
           .eq('id', user.id)
           .single();
         
-        if (perfil && ['personal', 'admin'].includes(perfil.rol)) {
+        if (perfil && perfil.rol === 'admin') {
           isAdminCall = true;
         }
       }
@@ -4331,17 +4397,30 @@ serve(async (req: Request) => {
     console.log(`[crear-usuario-cliente] Is Admin Call: ${isAdminCall}`);
 
     // --- Lógica de Creación ---
-    // Si no es una llamada de admin, se fuerzan los valores por defecto para un registro público.
+    // Normalización y validación de datos
+    saldo_inicial = Number(saldo_inicial) || 0;
+
+    // Valid roles and tipos
+    const validTipos = ['alumno', 'padre', 'personal'];
+
+    // If this is not an admin call, force system role to 'cliente' and default tipo to 'alumno'
     if (!isAdminCall) {
-      saldo_inicial = 0;
       rol = 'cliente';
       tipo = 'alumno';
+      saldo_inicial = 0; // force zero for public registrations
+    } else {
+      // Admin calls may create admin users only if explicitly requested
+      if (rol === 'admin') {
+        // keep as admin
+      } else {
+        // For any other value, treat as cliente
+        rol = 'cliente';
+      }
+      // Validate tipo
+      if (!validTipos.includes(tipo)) {
+        tipo = 'alumno';
+      }
     }
-
-    // Normalización de datos
-    saldo_inicial = Number(saldo_inicial) || 0;
-    rol = rol || 'cliente';
-    tipo = tipo || 'alumno';
 
     // 1. Crear usuario en Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -4406,7 +4485,73 @@ serve(async (req: Request) => {
 });
 ```
 
-## File: `supabase/functions/gestionar-fondos/index.ts`
+## File: `supabase\functions\gestionar-amistad\index.ts`
+```ts
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Autenticación requerida.");
+
+    const { amistad_id, accion } = await req.json(); // accion: 'aceptar', 'rechazar', 'eliminar'
+    if (!amistad_id || !accion) throw new Error("Parámetros 'amistad_id' y 'accion' son requeridos.");
+
+    // Fetch the friendship record
+    const { data: amistad, error: fetchError } = await supabase
+      .from('amistades')
+      .select('*')
+      .eq('id', amistad_id)
+      .single();
+
+    if (fetchError || !amistad) throw new Error("Solicitud de amistad no encontrada.");
+
+    let responseMessage = '';
+
+    if (accion === 'aceptar') {
+      if (amistad.usuario_receptor_id !== user.id) throw new Error("No autorizado para aceptar esta solicitud.");
+      const { error } = await supabase.from('amistades').update({ estado: 'aceptada', fecha_actualizacion: new Date().toISOString() }).eq('id', amistad_id);
+      if (error) throw error;
+      responseMessage = 'Amistad aceptada.';
+    } else if (accion === 'rechazar' || accion === 'eliminar') {
+      // Authorize: either the requester or receiver can delete/reject
+      if (amistad.usuario_receptor_id !== user.id && amistad.usuario_solicitante_id !== user.id) throw new Error("No autorizado para esta acción.");
+      const { error } = await supabase.from('amistades').delete().eq('id', amistad_id);
+      if (error) throw error;
+      responseMessage = accion === 'rechazar' ? 'Solicitud rechazada.' : 'Amigo eliminado.';
+    } else {
+      throw new Error("Acción no válida.");
+    }
+
+    return new Response(JSON.stringify({ message: responseMessage }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+});
+```
+
+## File: `supabase\functions\gestionar-fondos\index.ts`
 ```ts
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
@@ -4480,7 +4625,7 @@ serve(async (req: Request) => {
 });
 ```
 
-## File: `supabase/functions/iniciar-transferencia-cliente/index.ts`
+## File: `supabase\functions\iniciar-transferencia-cliente\index.ts`
 ```ts
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
@@ -4534,7 +4679,83 @@ serve(async (req: Request) => {
 });
 ```
 
-## File: `supabase/migrations/001_create_numero_cuenta_seq_and_function.sql`
+## File: `supabase\functions\solicitar-amistad\index.ts`
+```ts
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Autenticación requerida.");
+
+    const { numero_cuenta_amigo } = await req.json();
+    if (!numero_cuenta_amigo) throw new Error("El número de cuenta es requerido.");
+
+    // Find the recipient's profile by account number
+    const { data: cuentaDestino, error: cuentaError } = await supabase
+      .from('cuentas')
+      .select('usuario_id, perfiles ( nombre_completo )')
+      .eq('numero_cuenta', numero_cuenta_amigo)
+      .single();
+
+    if (cuentaError || !cuentaDestino) throw new Error("El número de cuenta no fue encontrado.");
+    const receptorId = cuentaDestino.usuario_id;
+    const receptorNombre = cuentaDestino.perfiles.nombre_completo;
+
+    // Insert friendship request
+    const { error: insertError } = await supabase
+      .from('amistades')
+      .insert({
+        usuario_solicitante_id: user.id,
+        usuario_receptor_id: receptorId,
+        estado: 'pendiente'
+      });
+
+    if (insertError) {
+        // Handle unique constraint violation gracefully
+        if (insertError.code === '23505') {
+            throw new Error("Ya existe una solicitud de amistad con este usuario.");
+        }
+        throw insertError;
+    }
+    
+    // Create a notification for the recipient
+    await supabase.from('notificaciones').insert({
+        usuario_id: receptorId,
+        tipo: 'solicitud_amistad',
+        mensaje: `Has recibido una solicitud de amistad de ${user.user_metadata.nombre_completo}.`,
+        enlace: '/dashboard/amigos'
+    });
+
+    return new Response(JSON.stringify({ message: `Solicitud enviada a ${receptorNombre}.` }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 201,
+    });
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+});
+```
+
+## File: `supabase\migrations\001_create_numero_cuenta_seq_and_function.sql`
 ```sql
 -- Migration: create sequence and create_account_for_user function
 -- Creates a sequence for numero_cuenta and a helper RPC to create accounts atomically
@@ -4587,7 +4808,7 @@ $$ LANGUAGE plpgsql;
 
 ```
 
-## File: `supabase/migrations/002_add_tipo_to_perfiles_and_constraints.sql`
+## File: `supabase\migrations\002_add_tipo_to_perfiles_and_constraints.sql`
 ```sql
 -- Migration: add 'tipo' column to perfiles and update role/tipo constraints
 -- Adds a 'tipo' column to distinguish client types (alumno, padre, personal)
@@ -4595,11 +4816,12 @@ $$ LANGUAGE plpgsql;
 ALTER TABLE IF EXISTS public.perfiles
   ADD COLUMN IF NOT EXISTS tipo text NOT NULL DEFAULT 'alumno';
 
--- Ensure the rol constraint includes system roles: cliente, personal, admin
+-- Ensure the rol constraint includes system roles: cliente, admin
+-- NOTE: 'personal' is a profile type, not a system role. Roles should be either 'cliente' or 'admin'.
 ALTER TABLE IF EXISTS public.perfiles
   DROP CONSTRAINT IF EXISTS rol_valido;
 ALTER TABLE IF EXISTS public.perfiles
-  ADD CONSTRAINT rol_valido CHECK (rol IN ('cliente', 'personal', 'admin'));
+  ADD CONSTRAINT rol_valido CHECK (rol IN ('cliente', 'admin'));
 
 -- Add a constraint for tipo values used by the UI: alumno, padre, personal
 ALTER TABLE IF EXISTS public.perfiles
@@ -4609,6 +4831,301 @@ ALTER TABLE IF EXISTS public.perfiles
 
 -- Backfill existing rows: if tipo is NULL or empty set to 'alumno'
 UPDATE public.perfiles SET tipo = 'alumno' WHERE tipo IS NULL OR tipo = '';
+
+```
+
+## File: `supabase\migrations\003_create_friends_and_notifications.sql`
+```sql
+-- Migration: Create tables for Friends (amistades) and Notifications
+-- This schema supports a request-based friendship system.
+
+-- 1. Create the 'amistades' (Friendships) table
+CREATE TABLE IF NOT EXISTS public.amistades (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    
+    -- The user who sent the request
+    usuario_solicitante_id UUID NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+    
+    -- The user who received the request
+    usuario_receptor_id UUID NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+    
+    -- Status of the friendship: 'pendiente', 'aceptada', 'bloqueada'
+    estado TEXT NOT NULL DEFAULT 'pendiente',
+    
+    -- Timestamps
+    fecha_solicitud TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+    
+    -- Constraints
+    CONSTRAINT estado_valido CHECK (estado IN ('pendiente', 'aceptada', 'bloqueada')),
+    -- A user cannot send a request to themselves
+    CONSTRAINT no_self_friendship CHECK (usuario_solicitante_id <> usuario_receptor_id),
+    -- Ensure only one relationship record exists between two users, regardless of who is the requester
+    CONSTRAINT unique_friendship_pair UNIQUE (LEAST(usuario_solicitante_id, usuario_receptor_id), GREATEST(usuario_solicitante_id, usuario_receptor_id))
+);
+
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_amistades_usuario_solicitante ON public.amistades(usuario_solicitante_id);
+CREATE INDEX IF NOT EXISTS idx_amistades_usuario_receptor ON public.amistades(usuario_receptor_id);
+
+
+-- 2. Create the 'notificaciones' (Notifications) table
+CREATE TABLE IF NOT EXISTS public.notificaciones (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    
+    -- The user who will receive the notification
+    usuario_id UUID NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+    
+    -- Type of notification (e.g., 'solicitud_amistad')
+    tipo TEXT NOT NULL,
+    
+    -- Message content
+    mensaje TEXT NOT NULL,
+    
+    -- Link to the relevant page (e.g., /dashboard/amigos)
+    enlace TEXT,
+    
+    -- Read status
+    leida BOOLEAN NOT NULL DEFAULT FALSE,
+    
+    -- Timestamps
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
+);
+
+-- Index for faster lookups of a user's notifications
+CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario_id ON public.notificaciones(usuario_id);
+
+```
+
+## File: `supabase\migrations\003_fix_rol_backfill_and_constraint.sql`
+```sql
+-- Migration 003: Backfill incorrect rol values and add strict rol constraint
+-- Purpose: fix existing rows where rol was incorrectly set to 'personal' and enforce rol constraint ('cliente','admin')
+
+BEGIN;
+
+-- 1) Backfill: Convert incorrect 'personal' role values to 'cliente'.
+--    We assume rows with rol='personal' are actually clients whose tipo='personal'.
+UPDATE public.perfiles
+SET rol = 'cliente'
+WHERE rol = 'personal';
+
+-- 2) Ensure there are no other unexpected rol values (sanity check)
+--    If there are rows still not in ('cliente','admin'), this migration will fail and rollback.
+--    This prevents adding the constraint when data would violate it.
+DO $$
+DECLARE
+    bad_count INT;
+BEGIN
+    SELECT COUNT(*) INTO bad_count FROM public.perfiles WHERE rol NOT IN ('cliente','admin');
+    IF bad_count > 0 THEN
+        RAISE EXCEPTION 'Found % rows with invalid rol values; aborting migration to avoid constraint violation', bad_count;
+    END IF;
+END$$;
+
+-- 3) Apply the strict constraint for rol
+ALTER TABLE IF EXISTS public.perfiles
+  DROP CONSTRAINT IF EXISTS rol_valido;
+
+ALTER TABLE IF EXISTS public.perfiles
+  ADD CONSTRAINT rol_valido CHECK (rol IN ('cliente', 'admin'));
+
+COMMIT;
+
+```
+
+## File: `SUPABASE_DATABASE.md`
+```md
+# Documentación de la Base de Datos Supabase (proyecto: banco_ie)
+
+Fecha: 13/09/2025
+
+Resumen
+-------
+Este documento describe el esquema de la base de datos `public` del proyecto Supabase `banco_ie`, las tablas principales, columnas, restricciones, índices, funciones (RPC), y cómo la aplicación realiza la autenticación y usa las keys (anon/service-role) en las edge functions.
+
+Contenido
+- Resumen del esquema
+- Tablas: `perfiles`, `cuentas`, `transacciones` (columnas, tipos, defaults)
+- Constraints: PK, FKs, UNIQUE, CHECK
+- Índices
+- Funciones/RPC en la base de datos: `realizar_transferencia` (y otras detectadas)
+- Edge Functions en `supabase/functions`
+- Autenticación y configuración (según `supabase/config.toml` y uso en el código)
+- Recomendaciones de seguridad y mejoras
+
+Esquema público
+---------------
+Tablas detectadas en `public`:
+- perfiles
+- cuentas
+- transacciones
+
+1) Tabla `cuentas`
+- Columnas
+  - `id` : uuid, NOT NULL, DEFAULT `gen_random_uuid()` (PK)
+  - `usuario_id` : uuid, NOT NULL, FK -> `perfiles(id)`, UNIQUE
+  - `numero_cuenta` : text, NOT NULL, UNIQUE
+  - `saldo_actual` : numeric, NOT NULL, DEFAULT `0.00`
+  - `fecha_apertura` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
+
+- Constraints notables
+  - `cuentas_pkey` (PRIMARY KEY on `id`)
+  - `cuentas_usuario_id_fkey` (FOREIGN KEY `usuario_id` -> `perfiles(id)`)
+  - `cuentas_usuario_id_key` (UNIQUE on `usuario_id`)
+  - `cuentas_numero_cuenta_key` (UNIQUE on `numero_cuenta`)
+  - `saldo_no_negativo` (CHECK constraint enforcing saldo no negativo)
+  - Varios NOT NULL check constraints generados automáticamente por Postgres for NOT NULL columns
+
+- Índices
+  - `cuentas_pkey` (b-tree on `id`)
+  - `cuentas_usuario_id_key` (unique b-tree on `usuario_id`)
+  - `cuentas_numero_cuenta_key` (unique b-tree on `numero_cuenta`)
+
+2) Tabla `perfiles`
+- Columnas
+  - `id` : uuid, NOT NULL (PK)
+  - `nombre_completo` : text, NOT NULL
+  - `rol` : text, NOT NULL, DEFAULT `'cliente'`::text
+  - `fecha_creacion` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
+
+- Constraints
+  - `perfiles_pkey` (PRIMARY KEY on `id`)
+  - `perfiles_id_fkey` (FOREIGN KEY `id` -> `users(id)`?) - NOTE: There is an FK referencing `users` inferred in the typed file. In the DB inspection, `perfiles_id_fkey` exists but referenced table may be part of `auth` schema; the typed db file shows relation to `users(id)` (auth.users)
+  - `rol_valido` (CHECK constraint to validate `rol` values)
+
+- Índices
+  - `perfiles_pkey` (b-tree on `id`)
+
+3) Tabla `transacciones`
+- Columnas
+  - `id` : bigint, NOT NULL (PK)
+  - `cuenta_origen_id` : uuid, NULLABLE, FK -> `cuentas(id)`
+  - `cuenta_destino_id` : uuid, NULLABLE, FK -> `cuentas(id)`
+  - `monto` : numeric, NOT NULL
+  - `tipo` : text, NOT NULL (ej: 'deposito', 'retiro', 'transferencia')
+  - `descripcion` : text, NULLABLE
+  - `fecha` : timestamp with time zone, NOT NULL, DEFAULT `timezone('utc', now())`
+
+- Constraints
+  - `transacciones_pkey` (PRIMARY KEY on `id`)
+  - `transacciones_cuenta_origen_id_fkey` (FOREIGN KEY -> `cuentas(id)`)
+  - `transacciones_cuenta_destino_id_fkey` (FOREIGN KEY -> `cuentas(id)`)
+  - `monto_positivo` (CHECK enforcing monto > 0)
+  - `origen_o_destino_requerido` (CHECK ensuring origen o destino presente)
+  - `tipo_transaccion_valido` (CHECK enforcing valid `tipo` values)
+
+- Índices
+  - `transacciones_pkey` (b-tree on `id`)
+
+Funciones/RPC en la base de datos
+---------------------------------
+Se detectaron rutinas en el esquema `public`:
+
+1) `realizar_transferencia(cuenta_origen_id_param uuid, numero_cuenta_destino_param text, monto_param numeric) RETURNS void`
+- Comportamiento (resumen):
+  - Verifica que quien ejecuta tiene permiso (usa `auth.uid()` para validar propietario de `cuenta_origen_id_param`).
+  - Busca la `cuenta_destino` por `numero_cuenta_destino_param` con `FOR UPDATE`.
+  - Verifica que la cuenta destino existe y que no es la misma que la origen.
+  - Verifica saldo suficiente en la cuenta origen.
+  - Actualiza `saldo_actual` restando y sumando en origen/destino (bloqueando filas para concurrencia).
+  - Inserta una fila en `transacciones` con tipo `'transferencia'` y una descripción automatizada.
+  - Lanza excepción con mensajes claros en caso de error (cuenta inexistente, saldo insuficiente, permiso denegado).
+
+2) `realizar_movimiento(...) RETURNS boolean` (se detectó otra función con nombre `realizar_movimiento`, que maneja retiros/depositos/transferencias) -- definición parcial detectada.
+- Nota: `realizar_movimiento` parece ser una versión anterior o auxiliar. Documentar con precaución y revisar código si se usa.
+
+Edge Functions (carpeta `supabase/functions`)
+----------------------------------------------
+En el repo existe una carpeta `supabase/functions` con las siguientes funciones:
+- `crear-usuario-cliente/index.ts` (Edge Function Deno)
+  - Usa `SUPABASE_SERVICE_ROLE_KEY` y `SUPABASE_URL` para crear usuarios vía `supabaseAdmin.auth.admin.createUser`, inserta en `perfiles`, crea `cuentas` y registra `transacciones` si `saldo_inicial > 0`.
+  - Genera `numero_cuenta` aleatorio de 10 dígitos.
+  - CORS habilitado con cabeceras en `_shared/cors.ts`.
+
+- `gestionar-fondos/index.ts`
+  - Usa `SUPABASE_SERVICE_ROLE_KEY` para modificar saldos (depósito/retiro) y registrar transacciones.
+  - Nota: TODO en código para verificar que quien llama es admin.
+
+- `iniciar-transferencia-cliente/index.ts`
+  - Usa `SUPABASE_ANON_KEY` junto con el header Authorization del request para autenticar al usuario (usa `supabase.auth.getUser()`)
+  - Encuentra la cuenta del usuario (por `usuario_id`) y llama al RPC `realizar_transferencia` con `rpc`.
+
+Autenticación y configuración
+-----------------------------
+- `supabase/config.toml` indica `auth.enabled = true` y configuración local (jwt_expiry, enable_signup = true, etc.).
+- El código del frontend/server crea clientes Supabase:
+  - `src/lib/supabase/client.ts` usa `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` para el cliente de navegador.
+  - `src/lib/supabase/server.ts` usa también `NEXT_PUBLIC_SUPABASE_ANON_KEY` y maneja cookies para sesiones en Server Components.
+- Edge Functions:
+  - `crear-usuario-cliente` y `gestionar-fondos` usan `SUPABASE_SERVICE_ROLE_KEY` (privilegiada) para operaciones administrativas.
+  - `iniciar-transferencia-cliente` usa `SUPABASE_ANON_KEY` pero reenvía la cabecera `Authorization` para que `supabase.auth.getUser()` resuelva el usuario autenticado.
+
+RLS (Row Level Security) y políticas
+-----------------------------------
+- NO HAY RLS, SERÁ IMPLEMENTADO A FUTURO.
+
+Archivos relevantes en el repo
+------------------------------
+- `src/lib/supabase/database.types.ts` — tipado generado que refleja las tablas `cuentas`, `perfiles`, `transacciones` y la función `realizar_transferencia`.
+- `src/lib/supabase/client.ts` — creación de cliente browser.
+- `src/lib/supabase/server.ts` — creación de cliente server con cookies.
+- `supabase/config.toml` — configuración local de supabase (auth, api, ports, etc.).
+- `supabase/functions/*` — Edge Functions: `crear-usuario-cliente`, `gestionar-fondos`, `iniciar-transferencia-cliente`.
+
+Apéndice: Resultados SQL crudos
+
+## Apéndice: Esquema de Amistades y Notificaciones (Feature: Friends)
+
+4) Tabla `amistades`
+- Columnas
+  - `id`: bigint, PK
+  - `usuario_solicitante_id`: uuid, FK -> `perfiles(id)` (quien envía la solicitud)
+  - `usuario_receptor_id`: uuid, FK -> `perfiles(id)` (quien recibe la solicitud)
+  - `estado`: text, NOT NULL, DEFAULT `'pendiente'` (valores: 'pendiente', 'aceptada', 'bloqueada')
+  - `fecha_solicitud`: timestamptz
+  - `fecha_actualizacion`: timestamptz
+- Constraints notables
+  - `unique_friendship_pair`: Previene registros duplicados entre dos usuarios.
+
+5) Tabla `notificaciones`
+- Columnas
+  - `id`: bigint, PK
+  - `usuario_id`: uuid, FK -> `perfiles(id)` (dueño de la notificación)
+  - `tipo`: text, NOT NULL (ej: 'solicitud_amistad')
+  - `mensaje`: text, NOT NULL
+  - `enlace`: text, NULLABLE (ej: '/dashboard/amigos')
+  - `leida`: boolean, DEFAULT `false`
+  - `fecha_creacion`: timestamptz
+
+### Edge Functions (Nuevas)
+- `solicitar-amistad/index.ts`
+  - Autentica al usuario, busca al destinatario por número de cuenta, y crea una solicitud de amistad en estado 'pendiente'. También crea una notificación para el receptor.
+- `gestionar-amistad/index.ts`
+  - Un endpoint unificado para que los usuarios acepten, rechacen o eliminen amistades. Valida que el usuario que realiza la acción esté autorizado para hacerlo.
+
+### Privacy, Testing, and Rollout Strategy
+**Privacy Settings:** Para una implementación mínima, se omiten controles de privacidad detallados. Una mejora futura podría agregar una columna a la tabla perfiles (por ejemplo, permitir_solicitudes_amistad BOOLEAN) para que los usuarios puedan rechazar solicitudes.
+
+**Testing:**
+- Manual: Crear dos cuentas de prueba. Usuario A envía solicitud a Usuario B. Usuario B recibe notificación y acepta. Ambos deben verse como amigos. Probar también la función Eliminar.
+- Automatizado (futuro): Escribir tests de integración para las Edge Functions usando herramientas de Supabase.
+
+**Monitoring:** Monitorear los logs de ejecución de las nuevas Edge Functions en el dashboard de Supabase.
+
+**Rollout con Feature Flags:**
+Implementar un flag en las variables de entorno, por ejemplo: NEXT_PUBLIC_FEATURE_FRIENDS_ENABLED=true.
+En el archivo src/components/client-navigation.tsx, renderizar condicionalmente el link "Amigos":
+
+```tsx
+{process.env.NEXT_PUBLIC_FEATURE_FRIENDS_ENABLED === 'true' && (
+    <Link href="/dashboard/amigos" ...>
+        <Users className="h-4 w-4" /> Amigos
+    </Link>
+)}
+```
+Esto permite desplegar el código sin exponer la funcionalidad hasta que esté lista. Para activarla, basta con setear la variable y redeplegar.
+
 
 ```
 
