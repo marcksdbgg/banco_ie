@@ -63,6 +63,7 @@ banco_ie/
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   ├── components
+│   │   ├── DashboardQuickActions.tsx
 │   │   ├── MyQrCodeDialog.tsx
 │   │   ├── QrScannerDialog.tsx
 │   │   ├── admin-guard.tsx
@@ -87,9 +88,19 @@ banco_ie/
 │   │   │   ├── op_atomicas.db
 │   │   │   └── server.ts
 │   │   └── utils.ts
-│   └── middleware.ts
+│   ├── middleware.ts
+│   └── types
+│       └── html5-qrcode.d.ts
 ├── supabase
 │   ├── .gitignore
+│   ├── .temp
+│   │   ├── cli-latest
+│   │   ├── gotrue-version
+│   │   ├── pooler-url
+│   │   ├── postgres-version
+│   │   ├── project-ref
+│   │   ├── rest-version
+│   │   └── storage-version
 │   ├── config.toml
 │   ├── functions
 │   │   ├── _shared
@@ -109,8 +120,7 @@ banco_ie/
 │   └── migrations
 │       ├── 001_create_numero_cuenta_seq_and_function.sql
 │       ├── 002_add_tipo_to_perfiles_and_constraints.sql
-│       ├── 003_create_friends_and_notifications.sql
-│       └── 003_fix_rol_backfill_and_constraint.sql
+│       └── 003_create_friends_and_notifications.sql
 ├── tailwind.config.ts
 └── tsconfig.json
 ```
@@ -137,10 +147,10 @@ banco_ie/
     "clsx": "^2.1.0",
     "lucide-react": "^0.468.0",
     "next": "^15.5.3",
-    "qrcode.react": "^4.2.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-qr-reader": "^3.0.0-beta-1",
+  "qrcode.react": "^4.2.0",
+  "react": "^19.0.0",
+  "react-dom": "^19.0.0",
+  "@zxing/browser": "^0.0.10",
     "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
@@ -192,8 +202,9 @@ banco_ie/
 
 ## File: `.env.local`
 ```local
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_URL="TU_SUPABASE_URL"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="TU_SUPABASE_ANON_KEY"
+
 ```
 
 ## File: `.gitignore`
@@ -530,7 +541,7 @@ export default function ComedorPage() {
 ```tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import MyQrCodeDialog from '@/components/MyQrCodeDialog';
 import QrScannerDialog from '@/components/QrScannerDialog';
 import { QrCode, ScanLine } from 'lucide-react';
@@ -545,7 +556,7 @@ import type { User } from '@supabase/supabase-js';
 
 type Amistad = {
     id: number;
-    estado: 'pendiente' | 'aceptada';
+    estado: 'pendiente' | 'aceptada' | 'bloqueada';
     solicitante: { id: string; nombre_completo: string; };
     receptor: { id: string; nombre_completo: string; };
 };
@@ -564,7 +575,14 @@ export default function AmigosPage() {
 
     const supabase = createClient();
 
-    const fetchAmistades = async (userId: string) => {
+    type QueryRow = {
+        id: number;
+        estado: 'pendiente' | 'aceptada' | 'bloqueada';
+        solicitante: { id: string; nombre_completo: string } | Array<{ id: string; nombre_completo: string }> | null;
+        receptor: { id: string; nombre_completo: string } | Array<{ id: string; nombre_completo: string }> | null;
+    };
+
+    const fetchAmistades = useCallback(async (userId: string) => {
         setLoading(true);
         const { data, error } = await supabase
             .from('amistades')
@@ -581,28 +599,28 @@ export default function AmigosPage() {
             setError('Error al cargar la lista de amigos.');
             console.error(error);
         } else {
-            // Fix: map arrays to single objects
-            const amistades = (data as any[] || []).map(a => ({
-                id: a.id,
-                estado: a.estado,
-                solicitante: Array.isArray(a.solicitante) ? a.solicitante[0] : a.solicitante,
-                receptor: Array.isArray(a.receptor) ? a.receptor[0] : a.receptor,
-            }));
-            setAmistades(amistades);
+            // map arrays to single objects (Supabase can return nested arrays)
+            const rows = (data as QueryRow[] || []).map(r => ({
+                id: r.id,
+                estado: r.estado,
+                solicitante: Array.isArray(r.solicitante) ? r.solicitante[0] : (r.solicitante ?? { id: '', nombre_completo: '' }),
+                receptor: Array.isArray(r.receptor) ? r.receptor[0] : (r.receptor ?? { id: '', nombre_completo: '' }),
+            })) as Amistad[];
+            setAmistades(rows);
         }
         setLoading(false);
-    };
+    }, [supabase]);
 
     useEffect(() => {
         const init = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setUser(user);
-                fetchAmistades(user.id);
+                await fetchAmistades(user.id);
             }
         };
         init();
-    }, []);
+    }, [fetchAmistades, supabase]);
 
     const handleAddFriend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -671,14 +689,16 @@ export default function AmigosPage() {
                         <div className="flex-grow border-t border-gray-300"></div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button variant="outline" onClick={() => setIsQrDialogOpen(true)}>
-                            <QrCode className="mr-2 h-4 w-4" />
-                            Mi Código QR
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Button variant="outline" onClick={() => setIsQrDialogOpen(true)} className="w-full justify-center">
+                            <QrCode className="mr-2 h-5 w-5" aria-hidden="true" />
+                            <span className="hidden sm:inline">Mi Código QR</span>
+                            <span className="sm:hidden">Mostrar QR</span>
                         </Button>
-                        <Button onClick={() => setIsScannerOpen(true)}>
-                            <ScanLine className="mr-2 h-4 w-4" />
-                            Escanear QR
+                        <Button onClick={() => setIsScannerOpen(true)} className="w-full justify-center">
+                            <ScanLine className="mr-2 h-5 w-5" aria-hidden="true" />
+                            <span className="hidden sm:inline">Escanear QR</span>
+                            <span className="sm:hidden">Escanear</span>
                         </Button>
                     </div>
 
@@ -758,6 +778,8 @@ import { redirect } from "next/navigation";
 import { formatSoles } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import dynamic from 'next/dynamic';
+const DashboardQuickActions = dynamic(() => import('@/components/DashboardQuickActions'));
 import Link from "next/link";
 import { Banknote, Clock, DollarSign, Send } from "lucide-react";
 import Image from "next/image";
@@ -859,9 +881,12 @@ export default async function DashboardPage() {
               Nueva Transferencia
             </Link>
           </Button>
-          <Button variant="outline" className="hidden md:inline-flex">
-            <Banknote className="h-4 w-4 mr-2" /> Ver Historial
-          </Button>
+          <div className="hidden md:flex items-center">
+            <DashboardQuickActions />
+            <Button variant="outline" className="ml-2">
+              <Banknote className="h-4 w-4 mr-2" /> Ver Historial
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -945,7 +970,8 @@ export default async function DashboardPage() {
                 >
                   Nueva Transferencia
                 </Link>
-                <a className="text-sm text-gray-600">Ver Beneficiarios</a>
+                <Link href="/dashboard/amigos" className="text-sm text-blue-600 hover:underline">Amigos</Link>
+                <Link href="/dashboard/amigos" className="text-sm text-gray-600 hover:underline">Mi Código QR</Link>
                 <a className="text-sm text-gray-600">Solicitar Ayuda</a>
               </div>
             </CardContent>
@@ -2713,6 +2739,16 @@ _[Skipped: binary or non-UTF8 file]_
   }
 }
 
+@keyframes scanline {
+  0% { transform: translateY(0%); opacity: 0.9 }
+  50% { transform: translateY(100%); opacity: 0.6 }
+  100% { transform: translateY(0%); opacity: 0.9 }
+}
+
+.animate-slide {
+  animation: scanline 2s linear infinite;
+}
+
 .card-ghost {
   background-color: transparent !important;
   box-shadow: none !important;
@@ -3189,6 +3225,38 @@ export default function ClientNavigation() {
 
 ```
 
+## File: `src\components\DashboardQuickActions.tsx`
+```tsx
+"use client";
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import MyQrCodeDialog from '@/components/MyQrCodeDialog';
+import QrScannerDialog from '@/components/QrScannerDialog';
+import { Users, QrCode } from 'lucide-react';
+
+export default function DashboardQuickActions() {
+  const [isQrOpen, setIsQrOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button variant="secondary" onClick={() => setIsScannerOpen(true)} className="flex items-center gap-2">
+        <QrCode className="h-4 w-4" /> Escanear QR
+      </Button>
+
+      <Button onClick={() => setIsQrOpen(true)} className="flex items-center gap-2">
+        <Users className="h-4 w-4" /> Mi Código QR
+      </Button>
+
+      <MyQrCodeDialog isOpen={isQrOpen} onClose={() => setIsQrOpen(false)} />
+      <QrScannerDialog isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScanSuccess={() => setIsScannerOpen(false)} />
+    </div>
+  );
+}
+
+```
+
 ## File: `src\components\MyQrCodeDialog.tsx`
 ```tsx
 'use client';
@@ -3221,7 +3289,7 @@ export default function MyQrCodeDialog({ isOpen, onClose }: MyQrCodeDialogProps)
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          const { data, error } = await supabase
+          const { data } = await supabase
             .from('cuentas')
             .select(`
               numero_cuenta,
@@ -3246,33 +3314,56 @@ export default function MyQrCodeDialog({ isOpen, onClose }: MyQrCodeDialogProps)
   }, [isOpen]);
 
   // IMPORTANT: The value of the QR code should be a full URL to make it universally scannable.
-  const qrCodeValue = userData ? `${window.location.origin}/dashboard/amigos/add?account=${userData.numero_cuenta}` : '';
+  const qrCodeValue = typeof window !== 'undefined' && userData ? `${window.location.origin}/dashboard/amigos/add?account=${userData.numero_cuenta}` : '';
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // small toast could be shown; we'll keep it simple
+      alert('Enlace copiado al portapapeles');
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-lg w-full">
         <DialogHeader>
           <DialogTitle>Mi Código QR</DialogTitle>
           <DialogDescription>
-            Pídele a tu amigo que escanee este código para añadirte.
+            Pídele a tu amigo que escanee este código para añadirte. También puedes copiar o compartir el enlace.
           </DialogDescription>
         </DialogHeader>
+
         <div className="flex flex-col items-center justify-center p-4 gap-4">
           {loading ? (
-            <Loader2 className="h-16 w-16 animate-spin" />
-          ) : userData ? (
+            <Loader2 className="h-16 w-16 animate-spin" aria-hidden="true" />
+          ) : userData && qrCodeValue ? (
             <>
-              <QRCodeSVG
-                value={qrCodeValue}
-                size={256}
-                bgColor={"#ffffff"}
-                fgColor={"#000000"}
-                level={"L"}
-                includeMargin={true}
-              />
+              <div className="w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 flex items-center justify-center bg-white p-2 rounded">
+                <QRCodeSVG
+                  value={qrCodeValue}
+                  size={512}
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                  level="L"
+                  includeMargin={true}
+                />
+              </div>
+
               <div className="text-center">
                 <p className="font-bold text-lg">{userData.nombre_completo}</p>
                 <p className="text-sm text-gray-500 font-mono">{userData.numero_cuenta}</p>
+              </div>
+
+              <div className="flex gap-2 mt-2 w-full">
+                <button type="button" className="btn btn-outline w-full" onClick={() => copyToClipboard(qrCodeValue)}>
+                  Copiar enlace
+                </button>
+                <a className="btn btn-primary w-full text-center" href={qrCodeValue} target="_blank" rel="noopener noreferrer">
+                  Abrir enlace
+                </a>
               </div>
             </>
           ) : (
@@ -3288,14 +3379,15 @@ export default function MyQrCodeDialog({ isOpen, onClose }: MyQrCodeDialogProps)
 
 ## File: `src\components\QrScannerDialog.tsx`
 ```tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { QrReader } from 'react-qr-reader';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 type QrScannerDialogProps = {
   isOpen: boolean;
@@ -3306,13 +3398,27 @@ type QrScannerDialogProps = {
 export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrScannerDialogProps) {
   const [status, setStatus] = useState<'scanning' | 'loading' | 'success' | 'error'>('scanning');
   const [message, setMessage] = useState('');
+  const [manualCode, setManualCode] = useState('');
+  const scannerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  type ZXingResult = { getText?: () => string; text?: string };
+  type DecodeCallback = (result: ZXingResult | null, error?: Error | null) => void;
+  type BrowserQRCodeReaderType = {
+    decodeFromVideoDevice(deviceId: string | undefined, element: HTMLVideoElement, cb: DecodeCallback): Promise<void>;
+    reset?: () => void;
+  };
 
-  const handleScanResult = async (result: any, error: any) => {
-    if (!!result && status === 'scanning') {
+  const codeReaderRef = useRef<BrowserQRCodeReaderType | null>(null);
+  const isRunningRef = useRef(false);
+
+  // stable handler for scan results
+  const handleScanResultCallback = useCallback(async (text: string) => {
+    if (text && status === 'scanning') {
       setStatus('loading');
       try {
-        const url = new URL(result.text);
-        const numeroCuenta = url.searchParams.get('account');
+        const url = new URL(text ?? '');
+        const numeroCuenta = url.searchParams.get('account') ?? text; // accept plain number as fallback
 
         if (!numeroCuenta) {
           throw new Error("Código QR no válido.");
@@ -3327,6 +3433,20 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
           throw new Error(data?.error || invokeError.message);
         }
 
+        // Stop scanner proactively before showing success UI
+        try {
+          if (codeReaderRef.current && isRunningRef.current) {
+            try {
+              codeReaderRef.current.reset?.();
+            } catch (errReset) {
+              // ignore reset errors
+              void errReset;
+            }
+          }
+        } catch (e) {
+          void e;
+        }
+
         setStatus('success');
         setMessage(data.message);
         setTimeout(() => {
@@ -3334,37 +3454,162 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
           onClose();       // Close the dialog
         }, 2000);
 
-      } catch (err) {
+      } catch (caught) {
         setStatus('error');
-        const error = err as Error;
+        const error = caught as Error;
         setMessage(error.message || 'Ocurrió un error.');
         // Reset after a delay so the user can try again
         setTimeout(() => setStatus('scanning'), 3000);
       }
     }
-  };
+  }, [status, onScanSuccess, onClose]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const startScanner = async () => {
+      if (!containerRef.current || !scannerRef.current) return;
+      try {
+        const mod = await import('@zxing/browser');
+        if (!mounted) return;
+
+        // create a video element (or reuse) inside the scanner wrapper
+        let videoEl = videoRef.current;
+        if (!videoEl) {
+          videoEl = document.createElement('video');
+          videoEl.setAttribute('playsInline', 'true');
+          videoEl.className = 'w-full h-full object-cover';
+          // empty the scannerRef and append the video
+          if (scannerRef.current) {
+            scannerRef.current.innerHTML = '';
+            scannerRef.current.appendChild(videoEl);
+          }
+          videoRef.current = videoEl;
+        }
+
+        const { BrowserQRCodeReader } = mod as typeof import('@zxing/browser');
+  const codeReader = (new BrowserQRCodeReader() as unknown) as BrowserQRCodeReaderType;
+        codeReaderRef.current = codeReader;
+
+        // start decoding from the default camera, callback-based for responsiveness
+        await codeReader.decodeFromVideoDevice(undefined, videoEl, (result, error) => {
+          if (result && mounted) {
+            const text = (typeof result.getText === 'function') ? result.getText!() : (result.text ?? String(result));
+            void handleScanResultCallback(String(text));
+          }
+          // ignore frame errors
+          void error;
+        });
+
+        isRunningRef.current = true;
+      } catch (err) {
+        setStatus('error');
+        setMessage((err as Error).message || 'No se pudo acceder a la cámara.');
+      }
+    };
+
+    if (isOpen) {
+      setStatus('scanning');
+      setMessage('');
+      startScanner();
+    }
+
+    return () => {
+      mounted = false;
+      const codeReader = codeReaderRef.current;
+      if (codeReader) {
+        try {
+          codeReader.reset?.();
+        } catch (e) {
+          void e;
+        }
+      }
+      codeReaderRef.current = null;
+      isRunningRef.current = false;
+    };
+  }, [isOpen, handleScanResultCallback]);
+
+  // manual input will call handleScanResultCallback above
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-lg w-full">
         <DialogHeader><DialogTitle>Escanear Código QR</DialogTitle></DialogHeader>
-        <div className="mt-4">
-          {status === 'scanning' && (
-            <QrReader
-              onResult={handleScanResult}
-              constraints={{ facingMode: 'environment' }}
-              className="w-full"
-            />
-          )}
-          {status === 'loading' && <Loader2 className="mx-auto h-16 w-16 animate-spin" />}
-          {status === 'success' && (
-            <Alert variant="default" className="bg-green-100"><CheckCircle /><AlertTitle>Éxito</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
-          )}
-          {status === 'error' && (
-            <Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
-          )}
+
+        <div className="mt-4 flex flex-col gap-4">
+          <p className="text-sm text-gray-600">Alinea el código QR dentro del área. Si la cámara no funciona, puedes ingresar el número de cuenta manualmente.</p>
+
+          <div ref={containerRef} className="w-full bg-gray-50 rounded overflow-hidden relative">
+            <div ref={scannerRef} className="w-full h-64 sm:h-96 bg-black/10" />
+
+            {/* Overlay: translucent edges with centered square cutout */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="relative w-[75%] max-w-[420px]">
+                <div className="absolute inset-0 bg-black/40 rounded-lg" />
+                <div className="mx-auto my-6 w-full" style={{ paddingTop: '100%', position: 'relative' }}>
+                  <div className="absolute inset-0 border-4 border-white rounded-md overflow-hidden">
+                    {/* animated scanline */}
+                    {status === 'scanning' && (
+                      <div className="absolute left-0 right-0 top-0 h-0.5 bg-white/80 scanline" style={{ transformOrigin: 'left' }} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {status === 'loading' && <div className="p-6 flex justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div>}
+
+            {status === 'success' && (
+              <div className="p-6 flex flex-col items-center gap-3">
+                <div className="rounded-full bg-green-100 p-4">
+                  <CheckCircle className="h-8 w-8 text-green-700" />
+                </div>
+                <h3 className="text-lg font-semibold">Contacto agregado</h3>
+                <p className="text-sm text-gray-600 text-center">{message || 'Se añadió a tu lista de amigos correctamente.'}</p>
+                <div className="mt-3">
+                  <Button onClick={() => { onScanSuccess(); onClose(); }}>Cerrar</Button>
+                </div>
+              </div>
+            )}
+
+            {status === 'error' && (
+              <div className="p-6">
+                <Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Input placeholder="Número de cuenta (si no puedes escanear)" value={manualCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualCode(e.target.value)} />
+            <Button onClick={async () => {
+              if (!manualCode) return setMessage('Ingresa un número de cuenta.');
+              setStatus('loading');
+              try {
+                const supabase = createClient();
+                const { data, error: invokeError } = await supabase.functions.invoke('solicitar-amistad', { body: { numero_cuenta_amigo: manualCode } });
+                if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+                setStatus('success');
+                setMessage(data.message);
+                setTimeout(() => { onScanSuccess(); onClose(); }, 2000);
+              } catch (err) {
+                setStatus('error');
+                setMessage((err as Error).message || 'Ocurrió un error.');
+                setTimeout(() => setStatus('scanning'), 3000);
+              }
+            }}>Enviar</Button>
+          </div>
         </div>
       </DialogContent>
+      <style jsx>{`
+        .scanline {
+          animation: scan 2.6s linear infinite;
+        }
+        @keyframes scan {
+          0% { transform: translateY(0%); opacity: 0.9; }
+          45% { opacity: 1; }
+          100% { transform: translateY(100%); opacity: 0.6; }
+        }
+      `}</style>
     </Dialog>
   );
 }
@@ -4159,6 +4404,31 @@ export const config = {
 
 ```
 
+## File: `src\types\html5-qrcode.d.ts`
+```ts
+declare module 'html5-qrcode' {
+  export type CameraConfig = { facingMode?: 'environment' | 'user' } | string;
+
+  export interface Html5QrcodeConfig {
+    fps?: number;
+    qrbox?: number | { width: number; height: number };
+  }
+
+  export class Html5Qrcode {
+    constructor(elementId: string | HTMLElement);
+    start(
+      cameraIdOrConfig: CameraConfig,
+      config?: Html5QrcodeConfig,
+      qrCodeSuccessCallback?: (decodedText: string) => void,
+      qrCodeErrorCallback?: (errorMessage: string) => void
+    ): Promise<void>;
+    stop(): Promise<void>;
+    clear(): void;
+  }
+}
+
+```
+
 ## File: `supabase\.gitignore`
 ```
 # Supabase
@@ -4170,6 +4440,41 @@ export const config = {
 .env.local
 .env.*.local
 
+```
+
+## File: `supabase\.temp\cli-latest`
+```
+v2.39.2
+```
+
+## File: `supabase\.temp\gotrue-version`
+```
+v2.179.0
+```
+
+## File: `supabase\.temp\pooler-url`
+```
+postgresql://postgres.vimimyacwnhuiywgwwup:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:6543/postgres
+```
+
+## File: `supabase\.temp\postgres-version`
+```
+17.4.1.064
+```
+
+## File: `supabase\.temp\project-ref`
+```
+vimimyacwnhuiywgwwup
+```
+
+## File: `supabase\.temp\rest-version`
+```
+v12.2.12
+```
+
+## File: `supabase\.temp\storage-version`
+```
+v1.26.4
 ```
 
 ## File: `supabase\config.toml`
@@ -5081,14 +5386,20 @@ CREATE TABLE IF NOT EXISTS public.amistades (
     -- Constraints
     CONSTRAINT estado_valido CHECK (estado IN ('pendiente', 'aceptada', 'bloqueada')),
     -- A user cannot send a request to themselves
-    CONSTRAINT no_self_friendship CHECK (usuario_solicitante_id <> usuario_receptor_id),
-    -- Ensure only one relationship record exists between two users, regardless of who is the requester
-    CONSTRAINT unique_friendship_pair UNIQUE (LEAST(usuario_solicitante_id, usuario_receptor_id), GREATEST(usuario_solicitante_id, usuario_receptor_id))
+    CONSTRAINT no_self_friendship CHECK (usuario_solicitante_id <> usuario_receptor_id)
 );
 
 -- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_amistades_usuario_solicitante ON public.amistades(usuario_solicitante_id);
 CREATE INDEX IF NOT EXISTS idx_amistades_usuario_receptor ON public.amistades(usuario_receptor_id);
+
+-- Ensure only one relationship record exists between two users, regardless of who is the requester.
+-- We use a UNIQUE INDEX on expressions (LEAST/GREATEST) because PostgreSQL doesn't allow functional
+-- expressions inside a table-level UNIQUE CONSTRAINT. This enforces an undirected uniqueness between the two UUIDs.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_amistades_pair ON public.amistades (
+    LEAST(usuario_solicitante_id, usuario_receptor_id),
+    GREATEST(usuario_solicitante_id, usuario_receptor_id)
+);
 
 
 -- 2. Create the 'notificaciones' (Notifications) table
@@ -5116,43 +5427,6 @@ CREATE TABLE IF NOT EXISTS public.notificaciones (
 
 -- Index for faster lookups of a user's notifications
 CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario_id ON public.notificaciones(usuario_id);
-
-```
-
-## File: `supabase\migrations\003_fix_rol_backfill_and_constraint.sql`
-```sql
--- Migration 003: Backfill incorrect rol values and add strict rol constraint
--- Purpose: fix existing rows where rol was incorrectly set to 'personal' and enforce rol constraint ('cliente','admin')
-
-BEGIN;
-
--- 1) Backfill: Convert incorrect 'personal' role values to 'cliente'.
---    We assume rows with rol='personal' are actually clients whose tipo='personal'.
-UPDATE public.perfiles
-SET rol = 'cliente'
-WHERE rol = 'personal';
-
--- 2) Ensure there are no other unexpected rol values (sanity check)
---    If there are rows still not in ('cliente','admin'), this migration will fail and rollback.
---    This prevents adding the constraint when data would violate it.
-DO $$
-DECLARE
-    bad_count INT;
-BEGIN
-    SELECT COUNT(*) INTO bad_count FROM public.perfiles WHERE rol NOT IN ('cliente','admin');
-    IF bad_count > 0 THEN
-        RAISE EXCEPTION 'Found % rows with invalid rol values; aborting migration to avoid constraint violation', bad_count;
-    END IF;
-END$$;
-
--- 3) Apply the strict constraint for rol
-ALTER TABLE IF EXISTS public.perfiles
-  DROP CONSTRAINT IF EXISTS rol_valido;
-
-ALTER TABLE IF EXISTS public.perfiles
-  ADD CONSTRAINT rol_valido CHECK (rol IN ('cliente', 'admin'));
-
-COMMIT;
 
 ```
 
