@@ -21,14 +21,20 @@ CREATE TABLE IF NOT EXISTS public.amistades (
     -- Constraints
     CONSTRAINT estado_valido CHECK (estado IN ('pendiente', 'aceptada', 'bloqueada')),
     -- A user cannot send a request to themselves
-    CONSTRAINT no_self_friendship CHECK (usuario_solicitante_id <> usuario_receptor_id),
-    -- Ensure only one relationship record exists between two users, regardless of who is the requester
-    CONSTRAINT unique_friendship_pair UNIQUE (LEAST(usuario_solicitante_id, usuario_receptor_id), GREATEST(usuario_solicitante_id, usuario_receptor_id))
+    CONSTRAINT no_self_friendship CHECK (usuario_solicitante_id <> usuario_receptor_id)
 );
 
 -- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_amistades_usuario_solicitante ON public.amistades(usuario_solicitante_id);
 CREATE INDEX IF NOT EXISTS idx_amistades_usuario_receptor ON public.amistades(usuario_receptor_id);
+
+-- Ensure only one relationship record exists between two users, regardless of who is the requester.
+-- We use a UNIQUE INDEX on expressions (LEAST/GREATEST) because PostgreSQL doesn't allow functional
+-- expressions inside a table-level UNIQUE CONSTRAINT. This enforces an undirected uniqueness between the two UUIDs.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_amistades_pair ON public.amistades (
+    LEAST(usuario_solicitante_id, usuario_receptor_id),
+    GREATEST(usuario_solicitante_id, usuario_receptor_id)
+);
 
 
 -- 2. Create the 'notificaciones' (Notifications) table
