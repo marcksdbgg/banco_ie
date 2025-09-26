@@ -34,18 +34,24 @@ export default function useFriends() {
 
       for (const r of rowsArr) {
         const row = r as Record<string, unknown>;
-        const solicitante = row.solicitante;
-        const receptor = row.receptor;
-        const s = Array.isArray(solicitante) ? (solicitante as unknown[])[0] : solicitante as Record<string, unknown> | undefined;
-        const rc = Array.isArray(receptor) ? (receptor as unknown[])[0] : receptor as Record<string, unknown> | undefined;
-        const friendObj = (s && (s as Record<string, unknown>).id === userId) ? rc : s;
-        const id = (friendObj && (friendObj as Record<string, unknown>).id) ? String((friendObj as Record<string, unknown>).id) : '';
-        const nombre = (friendObj && (friendObj as Record<string, unknown>).nombre_completo) ? String((friendObj as Record<string, unknown>).nombre_completo) : '';
+        // normalize nested relations which Supabase may return as arrays
+        const solicitanteRaw = row.solicitante;
+        const receptorRaw = row.receptor;
+        const solicitanteObj = Array.isArray(solicitanteRaw) ? (solicitanteRaw as unknown[])[0] as Record<string, unknown> : (solicitanteRaw as Record<string, unknown> | undefined);
+        const receptorObj = Array.isArray(receptorRaw) ? (receptorRaw as unknown[])[0] as Record<string, unknown> : (receptorRaw as Record<string, unknown> | undefined);
+
+        // Determine which side is the friend (the other user)
+        const friendObj = (solicitanteObj && String(solicitanteObj.id) === userId) ? receptorObj : solicitanteObj;
+        const id = friendObj && friendObj.id ? String(friendObj.id) : '';
+        const nombre = friendObj && friendObj.nombre_completo ? String(friendObj.nombre_completo) : '';
+
+        // try to read numero_cuenta from nested 'cuentas' relation
         let numero = '';
-        const cuentas = (friendObj && (friendObj as Record<string, unknown>).cuentas) ? (friendObj as Record<string, unknown>).cuentas as unknown[] : undefined;
-        if (Array.isArray(cuentas) && cuentas.length > 0) {
-          const c0 = cuentas[0] as Record<string, unknown>;
-          numero = c0.numero_cuenta ? String(c0.numero_cuenta) : '';
+        const cuentasRaw = friendObj?.cuentas;
+        const cuentasArr = Array.isArray(cuentasRaw) ? cuentasRaw as unknown[] : undefined;
+        if (cuentasArr && cuentasArr.length > 0) {
+          const c0 = cuentasArr[0] as Record<string, unknown>;
+          if (typeof c0?.numero_cuenta !== 'undefined') numero = String(c0.numero_cuenta);
         }
 
         // If numero not present, fallback to querying cuentas table directly by usuario_id
