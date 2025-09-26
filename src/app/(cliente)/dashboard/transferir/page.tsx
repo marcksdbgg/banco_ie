@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import FriendSelector from '@/components/FriendSelector';
 
 export default function TransferPage() {
     const router = useRouter();
@@ -17,6 +18,7 @@ export default function TransferPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+        const [selectedFriendName, setSelectedFriendName] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -77,15 +79,23 @@ export default function TransferPage() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
                             <Label htmlFor="numero-cuenta">Número de Cuenta de Destino</Label>
-                            <Input
-                                id="numero-cuenta"
-                                type="text"
-                                placeholder="Ej: 1234567890"
-                                value={numeroCuentaDestino}
-                                onChange={(e) => setNumeroCuentaDestino(e.target.value)}
-                                disabled={loading}
-                                required
-                            />
+                                <div className="space-y-2">
+                                    <FriendSelector onSelect={(numeroCuenta, friendName) => {
+                                        setNumeroCuentaDestino(numeroCuenta);
+                                        setSelectedFriendName(friendName || null);
+                                    }} disabled={loading} />
+
+                                    <Input
+                                        id="numero-cuenta"
+                                        type="text"
+                                        placeholder="Ej: 1234567890"
+                                        value={numeroCuentaDestino}
+                                        onChange={(e) => { setNumeroCuentaDestino(e.target.value); setSelectedFriendName(null); }}
+                                        disabled={loading}
+                                        required
+                                    />
+                                    {selectedFriendName && <div className="text-sm text-gray-600">Seleccionado: <strong>{selectedFriendName}</strong></div>}
+                                </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="monto">Monto a Transferir (S/.)</Label>
