@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import MyQrCodeDialog from '@/components/MyQrCodeDialog';
+import QrScannerDialog from '@/components/QrScannerDialog';
+import { QrCode, ScanLine } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +21,9 @@ type Amistad = {
 };
 
 export default function AmigosPage() {
+    // ...existing state
+        const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+        const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [amistades, setAmistades] = useState<Amistad[]>([]);
     const [loading, setLoading] = useState(true);
@@ -134,6 +140,25 @@ export default function AmigosPage() {
                             {isSubmitting ? <Loader2 className="animate-spin" /> : 'Enviar Solicitud'}
                         </Button>
                     </form>
+
+                    {/* ADDITION: Separator and QR Code buttons */}
+                    <div className="relative my-4 flex items-center">
+                        <div className="flex-grow border-t border-gray-300"></div>
+                        <span className="flex-shrink mx-4 text-gray-400 text-xs">O</span>
+                        <div className="flex-grow border-t border-gray-300"></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Button variant="outline" onClick={() => setIsQrDialogOpen(true)}>
+                            <QrCode className="mr-2 h-4 w-4" />
+                            Mi Código QR
+                        </Button>
+                        <Button onClick={() => setIsScannerOpen(true)}>
+                            <ScanLine className="mr-2 h-4 w-4" />
+                            Escanear QR
+                        </Button>
+                    </div>
+
                     {error && <Alert variant="destructive" className="mt-4"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                     {success && <Alert variant="default" className="mt-4 bg-green-50 border-green-200"><CheckCircle className="h-4 w-4" /><AlertTitle>Éxito</AlertTitle><AlertDescription>{success}</AlertDescription></Alert>}
                 </CardContent>
@@ -186,6 +211,17 @@ export default function AmigosPage() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* ADDITION: Render the dialog component */}
+            <MyQrCodeDialog isOpen={isQrDialogOpen} onClose={() => setIsQrDialogOpen(false)} />
+            <QrScannerDialog
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScanSuccess={() => {
+                    // When a scan is successful, refresh the friends list
+                    if (user) fetchAmistades(user.id);
+                }}
+            />
         </div>
     );
 }
