@@ -19,6 +19,7 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
   const [message, setMessage] = useState('');
   const [manualCode, setManualCode] = useState('');
   const scannerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const html5QrCodeRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null);
 
   // stable handler for scan results
@@ -63,23 +64,28 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
     let mounted = true;
 
     const startScanner = async () => {
-      if (!scannerRef.current) return;
+      if (!scannerRef.current || !containerRef.current) return;
       try {
-  const mod = await import('html5-qrcode');
-  const Html5Qrcode = (mod as unknown as { Html5Qrcode: typeof import('html5-qrcode').Html5Qrcode }).Html5Qrcode;
+        const mod = await import('html5-qrcode');
+        const Html5Qrcode = (mod as unknown as { Html5Qrcode: typeof import('html5-qrcode').Html5Qrcode }).Html5Qrcode;
         if (!mounted) return;
         const elementId = `html5qr-scanner-${Math.random().toString(36).slice(2, 9)}`;
-        // give the container a stable id for the library
+        // give the inner element a stable id for the library
         scannerRef.current.id = elementId;
         const html5QrCode = new Html5Qrcode(elementId);
         html5QrCodeRef.current = html5QrCode;
 
+        // compute a square qrbox based on container size
+        const rect = containerRef.current.getBoundingClientRect();
+        const minSide = Math.min(rect.width, rect.height);
+        const qrboxSize = Math.max(180, Math.floor(minSide * 0.75));
+
         await html5QrCode.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 10, qrbox: qrboxSize },
           (decodedText: string) => handleScanResultCallback(decodedText),
           (errorMessage: string) => {
-            // we could log errors per frame; keep UI stable
+            // ignore per-frame errors
             void errorMessage;
           }
         );
@@ -103,7 +109,7 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
       }
       html5QrCodeRef.current = null;
     };
-  }, [isOpen]);
+  }, [isOpen, handleScanResultCallback]);
 
   // manual input will call handleScanResultCallback above
 
@@ -115,18 +121,42 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
         <div className="mt-4 flex flex-col gap-4">
           <p className="text-sm text-gray-600">Alinea el código QR dentro del área. Si la cámara no funciona, puedes ingresar el número de cuenta manualmente.</p>
 
-          <div className="w-full bg-gray-50 rounded overflow-hidden">
-            <div ref={scannerRef} className="w-full h-64 sm:h-96" />
-            {status === 'scanning' && <p className="sr-only">Escaneando...</p>}
+          <div ref={containerRef} className="w-full bg-gray-50 rounded overflow-hidden relative">
+            <div ref={scannerRef} className="w-full h-64 sm:h-96 bg-black/10" />
+
+            {/* Overlay: translucent edges with centered square cutout */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="relative" style={{ width: '75%', maxWidth: 420 }}>
+                <div className="absolute inset-0 bg-black/40 rounded-lg" />
+                <div className="mx-auto my-6" style={{ width: '100%', paddingTop: '100%', position: 'relative' }}>
+                  <div className="absolute inset-0 border-4 border-white rounded-md" />
+                  {/* animated scanline */}
+                  {status === 'scanning' && (
+                    <div className="absolute left-0 right-0 top-0 h-0.5 bg-white/80 animate-slide" style={{ transformOrigin: 'left' }} />
+                  )}
+                </div>
+              </div>
+            </div>
 
             {status === 'loading' && <div className="p-6 flex justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div>}
 
             {status === 'success' && (
-              <Alert variant="default" className="bg-green-100"><CheckCircle /><AlertTitle>Éxito</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
+              <div className="p-6 flex flex-col items-center gap-3">
+                <div className="rounded-full bg-green-100 p-4">
+                  <CheckCircle className="h-8 w-8 text-green-700" />
+                </div>
+                <h3 className="text-lg font-semibold">Contacto agregado</h3>
+                <p className="text-sm text-gray-600 text-center">{message || 'Se añadió a tu lista de amigos correctamente.'}</p>
+                <div className="mt-3">
+                  <Button onClick={() => { onScanSuccess(); onClose(); }}>Cerrar</Button>
+                </div>
+              </div>
             )}
 
             {status === 'error' && (
-              <Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
+              <div className="p-6">
+                <Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
+              </div>
             )}
           </div>
 

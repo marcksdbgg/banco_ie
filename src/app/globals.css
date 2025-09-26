@@ -139,6 +139,16 @@
   }
 }
 
+@keyframes scanline {
+  0% { transform: translateY(0%); opacity: 0.9 }
+  50% { transform: translateY(100%); opacity: 0.6 }
+  100% { transform: translateY(0%); opacity: 0.9 }
+}
+
+.animate-slide {
+  animation: scanline 2s linear infinite;
+}
+
 .card-ghost {
   background-color: transparent !important;
   box-shadow: none !important;
