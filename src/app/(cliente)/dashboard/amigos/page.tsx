@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js';
 
 type Amistad = {
     id: number;
-    estado: 'pendiente' | 'aceptada';
+    estado: 'pendiente' | 'aceptada' | 'bloqueada';
     solicitante: { id: string; nombre_completo: string; };
     receptor: { id: string; nombre_completo: string; };
 };
@@ -28,7 +28,14 @@ export default function AmigosPage() {
 
     const supabase = createClient();
 
-    const fetchAmistades = async (userId: string) => {
+    type QueryRow = {
+        id: number;
+        estado: 'pendiente' | 'aceptada' | 'bloqueada';
+        solicitante: { id: string; nombre_completo: string } | Array<{ id: string; nombre_completo: string }> | null;
+        receptor: { id: string; nombre_completo: string } | Array<{ id: string; nombre_completo: string }> | null;
+    };
+
+    const fetchAmistades = useCallback(async (userId: string) => {
         setLoading(true);
         const { data, error } = await supabase
             .from('amistades')
@@ -45,28 +52,28 @@ export default function AmigosPage() {
             setError('Error al cargar la lista de amigos.');
             console.error(error);
         } else {
-            // Fix: map arrays to single objects
-            const amistades = (data as any[] || []).map(a => ({
-                id: a.id,
-                estado: a.estado,
-                solicitante: Array.isArray(a.solicitante) ? a.solicitante[0] : a.solicitante,
-                receptor: Array.isArray(a.receptor) ? a.receptor[0] : a.receptor,
-            }));
-            setAmistades(amistades);
+            // map arrays to single objects (Supabase can return nested arrays)
+            const rows = (data as QueryRow[] || []).map(r => ({
+                id: r.id,
+                estado: r.estado,
+                solicitante: Array.isArray(r.solicitante) ? r.solicitante[0] : (r.solicitante ?? { id: '', nombre_completo: '' }),
+                receptor: Array.isArray(r.receptor) ? r.receptor[0] : (r.receptor ?? { id: '', nombre_completo: '' }),
+            })) as Amistad[];
+            setAmistades(rows);
         }
         setLoading(false);
-    };
+    }, [supabase]);
 
     useEffect(() => {
         const init = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setUser(user);
-                fetchAmistades(user.id);
+                await fetchAmistades(user.id);
             }
         };
         init();
-    }, []);
+    }, [fetchAmistades, supabase]);
 
     const handleAddFriend = async (e: React.FormEvent) => {
         e.preventDefault();
