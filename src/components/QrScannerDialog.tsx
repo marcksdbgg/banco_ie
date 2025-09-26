@@ -17,11 +17,12 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
   const [status, setStatus] = useState<'scanning' | 'loading' | 'success' | 'error'>('scanning');
   const [message, setMessage] = useState('');
 
-  const handleScanResult = async (result: any, error: any) => {
-    if (!!result && status === 'scanning') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleScanResult = async (result: any) => {
+    if (result && status === 'scanning') {
       setStatus('loading');
       try {
-        const url = new URL(result.text);
+        const url = new URL(result.text ?? '');
         const numeroCuenta = url.searchParams.get('account');
 
         if (!numeroCuenta) {
@@ -44,9 +45,9 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
           onClose();       // Close the dialog
         }, 2000);
 
-      } catch (err) {
+      } catch (caught) {
         setStatus('error');
-        const error = err as Error;
+        const error = caught as Error;
         setMessage(error.message || 'Ocurrió un error.');
         // Reset after a delay so the user can try again
         setTimeout(() => setStatus('scanning'), 3000);

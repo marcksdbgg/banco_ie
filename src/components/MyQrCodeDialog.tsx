@@ -28,7 +28,7 @@ export default function MyQrCodeDialog({ isOpen, onClose }: MyQrCodeDialogProps)
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          const { data, error } = await supabase
+          const { data } = await supabase
             .from('cuentas')
             .select(`
               numero_cuenta,

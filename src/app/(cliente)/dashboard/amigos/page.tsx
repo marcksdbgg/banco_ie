@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import MyQrCodeDialog from '@/components/MyQrCodeDialog';
 import QrScannerDialog from '@/components/QrScannerDialog';
 import { QrCode, ScanLine } from 'lucide-react';
