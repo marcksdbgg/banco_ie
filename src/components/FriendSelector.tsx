@@ -1,95 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { createClient } from '@/lib/supabase/client';
+import { useMemo, useState } from 'react';
+import useFriends from '@/lib/hooks/useFriends';
+import { Button } from './ui/button';
 
-type Friend = { id: string; nombre_completo: string; numero_cuenta?: string };
-
-type Props = {
-  onSelect: (numeroCuenta: string, friendName?: string) => void;
-  disabled?: boolean;
-};
+type Props = { onSelect: (numeroCuenta: string, nombre?: string) => void; disabled?: boolean };
 
 export default function FriendSelector({ onSelect, disabled }: Props) {
+  const { friends, loading, refresh } = useFriends();
   const [query, setQuery] = useState('');
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [loading, setLoading] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
 
-  useEffect(() => {
-    let mounted = true;
-    const fetch = async () => {
-      setLoading(true);
-      try {
-        const userRes = await supabase.auth.getUser();
-        const userId = userRes.data.user?.id;
-        if (!userId) { setFriends([]); setLoading(false); return; }
-
-        // Query friendships and include the cuentas.numero_cuenta for each friend
-        // We select both roles (solicitante and receptor) and also fetch cuentas for those user ids
-        const { data: rows, error } = await supabase
-          .from('amistades')
-          .select(`
-            id,
-            estado,
-            solicitante:usuario_solicitante_id ( id, nombre_completo, cuentas ( numero_cuenta ) ),
-            receptor:usuario_receptor_id ( id, nombre_completo, cuentas ( numero_cuenta ) )
-          `)
-          .or(`usuario_solicitante_id.eq.${userId},usuario_receptor_id.eq.${userId}`)
-          .eq('estado', 'aceptada');
-
-        if (error) throw error;
-        const rowsArr = Array.isArray(rows) ? rows : [];
-        const list: Friend[] = rowsArr.map((r: unknown) => {
-          const row = r as Record<string, unknown>;
-          const solicitante = row.solicitante;
-          const receptor = row.receptor;
-          const s = Array.isArray(solicitante) ? (solicitante as unknown[])[0] : solicitante as Record<string, unknown> | undefined;
-          const rc = Array.isArray(receptor) ? (receptor as unknown[])[0] : receptor as Record<string, unknown> | undefined;
-          const friendObj = (s && (s as Record<string, unknown>).id === userId) ? rc : s;
-          const id = (friendObj && (friendObj as Record<string, unknown>).id) ? String((friendObj as Record<string, unknown>).id) : '';
-          const nombre = (friendObj && (friendObj as Record<string, unknown>).nombre_completo) ? String((friendObj as Record<string, unknown>).nombre_completo) : '';
-          // try to extract numero_cuenta from nested cuentas array if present
-          let numero = '';
-          const cuentas = (friendObj && (friendObj as Record<string, unknown>).cuentas) ? (friendObj as Record<string, unknown>).cuentas as unknown[] : undefined;
-          if (Array.isArray(cuentas) && cuentas.length > 0) {
-            const c0 = cuentas[0] as Record<string, unknown>;
-            numero = c0.numero_cuenta ? String(c0.numero_cuenta) : '';
-          }
-          return { id, nombre_completo: nombre, numero_cuenta: numero };
-        });
-        if (mounted) setFriends(list);
-      } catch {
-        if (mounted) setFriends([]);
-      }
-      if (mounted) setLoading(false);
-    };
-    fetch();
-    return () => { mounted = false; };
-  }, [supabase]);
-
-  const filtered = friends.filter(f => f.nombre_completo.toLowerCase().includes(query.toLowerCase()));
+  const filtered = useMemo(() => friends.filter(f => f.nombre_completo.toLowerCase().includes(query.toLowerCase())), [friends, query]);
 
   return (
     <div className="space-y-2">
-      <Input placeholder="Buscar amigo por nombre" value={query} onChange={(e) => setQuery(e.target.value)} disabled={disabled} />
-      <div className="max-h-48 overflow-auto border rounded p-1 bg-white">
-        {loading && <div className="text-sm text-gray-500 p-2">Cargando amigos...</div>}
-        {!loading && filtered.length === 0 && <div className="text-sm text-gray-500 p-2">No hay amigos encontrados.</div>}
-        {!loading && filtered.map(friend => (
-          <div key={friend.id} className="flex items-center justify-between gap-2 p-2 hover:bg-gray-50 rounded">
+      <input
+        className="input"
+        placeholder="Buscar amigo por nombre"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+
+      <div className="bg-white border rounded-md p-2">
+        {loading && <div>Cargando amigos...</div>}
+        {!loading && filtered.length === 0 && <div className="text-sm text-muted-foreground">No hay amigos</div>}
+
+        {filtered.map(f => (
+          <div key={f.id} className="flex items-center justify-between p-2 border-b last:border-b-0">
             <div>
-              <div className="font-medium">{friend.nombre_completo}</div>
-              <div className="text-xs text-gray-500">{friend.numero_cuenta ? `Cuenta: ${friend.numero_cuenta}` : 'Cuenta no disponible'}</div>
+              <div className="font-semibold">{f.nombre_completo}</div>
+              <div className="text-sm text-muted-foreground">{f.numero_cuenta ?? 'Cuenta no disponible'}</div>
             </div>
             <div>
-              <Button size="sm" onClick={() => onSelect(friend.numero_cuenta ?? '', friend.nombre_completo)} disabled={disabled || !friend.numero_cuenta}>Enviar</Button>
+              <Button size="sm" disabled={disabled || !f.numero_cuenta} onClick={() => onSelect(f.numero_cuenta ?? '', f.nombre_completo)}>Enviar</Button>
             </div>
           </div>
         ))}
       </div>
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" onClick={() => void refresh()}>Actualizar</Button>
+      </div>
     </div>
   );
 }
+
