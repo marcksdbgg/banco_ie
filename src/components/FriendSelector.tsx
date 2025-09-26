@@ -22,43 +22,47 @@ export default function FriendSelector({ onSelect, disabled }: Props) {
     let mounted = true;
     const fetch = async () => {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_friends_for_user');
-      // fallback: try query amistades table if RPC not present
-      if (error) {
-        try {
-          const userRes = await supabase.auth.getUser();
-          const userId = userRes.data.user?.id;
-          if (!userId) { setFriends([]); setLoading(false); return; }
-          const { data: rows } = await supabase
-            .from('amistades')
-            .select(`
-              solicitante:usuario_solicitante_id ( id, nombre_completo ),
-              receptor:usuario_receptor_id ( id, nombre_completo )
-            `)
-            .or(`usuario_solicitante_id.eq.${userId},usuario_receptor_id.eq.${userId}`)
-            .eq('estado', 'aceptada');
-          const rowsArr = Array.isArray(rows) ? rows : [];
-          const list: Friend[] = rowsArr.map((r: unknown) => {
-            const row = r as Record<string, unknown>;
-            const solicitante = row.solicitante;
-            const receptor = row.receptor;
-            const s = Array.isArray(solicitante) ? (solicitante as unknown[])[0] : solicitante as Record<string, unknown> | undefined;
-            const rc = Array.isArray(receptor) ? (receptor as unknown[])[0] : receptor as Record<string, unknown> | undefined;
-            const friend = (s && (s as Record<string, unknown>).id === userId) ? rc : s;
-            const id = (friend && (friend as Record<string, unknown>).id) ? String((friend as Record<string, unknown>).id) : '';
-            const nombre = (friend && (friend as Record<string, unknown>).nombre_completo) ? String((friend as Record<string, unknown>).nombre_completo) : '';
-            return { id, nombre_completo: nombre, numero_cuenta: '' };
-          });
-          if (mounted) setFriends(list);
-  } catch { if (mounted) setFriends([]); }
-      } else {
-        // assume RPC returns rows with id, nombre_completo, numero_cuenta
-        const rpcRows = Array.isArray(data) ? data as unknown[] : [];
-        const list = rpcRows.map(r => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const userId = userRes.data.user?.id;
+        if (!userId) { setFriends([]); setLoading(false); return; }
+
+        // Query friendships and include the cuentas.numero_cuenta for each friend
+        // We select both roles (solicitante and receptor) and also fetch cuentas for those user ids
+        const { data: rows, error } = await supabase
+          .from('amistades')
+          .select(`
+            id,
+            estado,
+            solicitante:usuario_solicitante_id ( id, nombre_completo, cuentas ( numero_cuenta ) ),
+            receptor:usuario_receptor_id ( id, nombre_completo, cuentas ( numero_cuenta ) )
+          `)
+          .or(`usuario_solicitante_id.eq.${userId},usuario_receptor_id.eq.${userId}`)
+          .eq('estado', 'aceptada');
+
+        if (error) throw error;
+        const rowsArr = Array.isArray(rows) ? rows : [];
+        const list: Friend[] = rowsArr.map((r: unknown) => {
           const row = r as Record<string, unknown>;
-          return { id: String(row.id ?? ''), nombre_completo: String(row.nombre_completo ?? ''), numero_cuenta: String(row.numero_cuenta ?? '') };
+          const solicitante = row.solicitante;
+          const receptor = row.receptor;
+          const s = Array.isArray(solicitante) ? (solicitante as unknown[])[0] : solicitante as Record<string, unknown> | undefined;
+          const rc = Array.isArray(receptor) ? (receptor as unknown[])[0] : receptor as Record<string, unknown> | undefined;
+          const friendObj = (s && (s as Record<string, unknown>).id === userId) ? rc : s;
+          const id = (friendObj && (friendObj as Record<string, unknown>).id) ? String((friendObj as Record<string, unknown>).id) : '';
+          const nombre = (friendObj && (friendObj as Record<string, unknown>).nombre_completo) ? String((friendObj as Record<string, unknown>).nombre_completo) : '';
+          // try to extract numero_cuenta from nested cuentas array if present
+          let numero = '';
+          const cuentas = (friendObj && (friendObj as Record<string, unknown>).cuentas) ? (friendObj as Record<string, unknown>).cuentas as unknown[] : undefined;
+          if (Array.isArray(cuentas) && cuentas.length > 0) {
+            const c0 = cuentas[0] as Record<string, unknown>;
+            numero = c0.numero_cuenta ? String(c0.numero_cuenta) : '';
+          }
+          return { id, nombre_completo: nombre, numero_cuenta: numero };
         });
         if (mounted) setFriends(list);
+      } catch {
+        if (mounted) setFriends([]);
       }
       if (mounted) setLoading(false);
     };
