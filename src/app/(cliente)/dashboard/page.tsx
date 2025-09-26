@@ -196,7 +196,7 @@ export default async function DashboardPage() {
                   Nueva Transferencia
                 </Link>
                 <Link href="/dashboard/amigos" className="text-sm text-blue-600 hover:underline">Amigos</Link>
-                <button onClick={() => { /* client component opens QR; keep a clear desktop/mobile CTA — fallback: navigate to amigos */ }} className="text-sm text-gray-600">Mi Código QR</button>
+                <Link href="/dashboard/amigos" className="text-sm text-gray-600 hover:underline">Mi Código QR</Link>
                 <a className="text-sm text-gray-600">Solicitar Ayuda</a>
               </div>
             </CardContent>
