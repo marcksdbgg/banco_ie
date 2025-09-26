@@ -1,7 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { QrReader } from 'react-qr-reader';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -19,14 +18,16 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
   const [status, setStatus] = useState<'scanning' | 'loading' | 'success' | 'error'>('scanning');
   const [message, setMessage] = useState('');
   const [manualCode, setManualCode] = useState('');
+  const scannerRef = useRef<HTMLDivElement | null>(null);
+  const html5QrCodeRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleScanResult = async (result: any) => {
-    if (result && status === 'scanning') {
+  // stable handler for scan results
+  const handleScanResultCallback = useCallback(async (text: string) => {
+    if (text && status === 'scanning') {
       setStatus('loading');
       try {
-        const url = new URL(result.text ?? '');
-        const numeroCuenta = url.searchParams.get('account');
+        const url = new URL(text ?? '');
+        const numeroCuenta = url.searchParams.get('account') ?? text; // accept plain number as fallback
 
         if (!numeroCuenta) {
           throw new Error("Código QR no válido.");
@@ -56,7 +57,55 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
         setTimeout(() => setStatus('scanning'), 3000);
       }
     }
-  };
+  }, [status, onScanSuccess, onClose]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const startScanner = async () => {
+      if (!scannerRef.current) return;
+      try {
+  const mod = await import('html5-qrcode');
+  const Html5Qrcode = (mod as unknown as { Html5Qrcode: typeof import('html5-qrcode').Html5Qrcode }).Html5Qrcode;
+        if (!mounted) return;
+        const elementId = `html5qr-scanner-${Math.random().toString(36).slice(2, 9)}`;
+        // give the container a stable id for the library
+        scannerRef.current.id = elementId;
+        const html5QrCode = new Html5Qrcode(elementId);
+        html5QrCodeRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText: string) => handleScanResultCallback(decodedText),
+          (errorMessage: string) => {
+            // we could log errors per frame; keep UI stable
+            void errorMessage;
+          }
+        );
+      } catch (err) {
+        setStatus('error');
+        setMessage((err as Error).message || 'No se pudo acceder a la cámara.');
+      }
+    };
+
+    if (isOpen) {
+      setStatus('scanning');
+      setMessage('');
+      startScanner();
+    }
+
+    return () => {
+      mounted = false;
+      const instance = html5QrCodeRef.current;
+      if (instance && instance.stop) {
+        instance.stop().catch(() => undefined).finally(() => instance.clear && instance.clear());
+      }
+      html5QrCodeRef.current = null;
+    };
+  }, [isOpen]);
+
+  // manual input will call handleScanResultCallback above
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -67,15 +116,8 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
           <p className="text-sm text-gray-600">Alinea el código QR dentro del área. Si la cámara no funciona, puedes ingresar el número de cuenta manualmente.</p>
 
           <div className="w-full bg-gray-50 rounded overflow-hidden">
-            {status === 'scanning' && (
-              <div className="aspect-square w-full">
-                <QrReader
-                  onResult={handleScanResult}
-                  constraints={{ facingMode: 'environment' }}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
+            <div ref={scannerRef} className="w-full h-64 sm:h-96" />
+            {status === 'scanning' && <p className="sr-only">Escaneando...</p>}
 
             {status === 'loading' && <div className="p-6 flex justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div>}
 
