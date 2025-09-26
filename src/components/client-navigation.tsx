@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LogOut, Settings, ShoppingCart, Coffee } from "lucide-react";
+import { LogOut, Settings, ShoppingCart, Coffee, Users } from "lucide-react";
 
 export default function ClientNavigation() {
   const router = useRouter();
@@ -41,6 +41,12 @@ export default function ClientNavigation() {
                 className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"
               >
                 <ShoppingCart className="h-4 w-4" /> Bazar
+              </Link>
+              <Link
+                href="/dashboard/amigos"
+                className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Users className="h-4 w-4" /> Amigos
               </Link>
             </nav>
           </div>
