@@ -148,14 +148,16 @@ export default function AmigosPage() {
                         <div className="flex-grow border-t border-gray-300"></div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button variant="outline" onClick={() => setIsQrDialogOpen(true)}>
-                            <QrCode className="mr-2 h-4 w-4" />
-                            Mi Código QR
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Button variant="outline" onClick={() => setIsQrDialogOpen(true)} className="w-full justify-center">
+                            <QrCode className="mr-2 h-5 w-5" aria-hidden="true" />
+                            <span className="hidden sm:inline">Mi Código QR</span>
+                            <span className="sm:hidden">Mostrar QR</span>
                         </Button>
-                        <Button onClick={() => setIsScannerOpen(true)}>
-                            <ScanLine className="mr-2 h-4 w-4" />
-                            Escanear QR
+                        <Button onClick={() => setIsScannerOpen(true)} className="w-full justify-center">
+                            <ScanLine className="mr-2 h-5 w-5" aria-hidden="true" />
+                            <span className="hidden sm:inline">Escanear QR</span>
+                            <span className="sm:hidden">Escanear</span>
                         </Button>
                     </div>
 
