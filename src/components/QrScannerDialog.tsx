@@ -20,7 +20,16 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
   const [manualCode, setManualCode] = useState('');
   const scannerRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const html5QrCodeRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  type ZXingResult = { getText?: () => string; text?: string };
+  type DecodeCallback = (result: ZXingResult | null, error?: Error | null) => void;
+  type BrowserQRCodeReaderType = {
+    decodeFromVideoDevice(deviceId: string | undefined, element: HTMLVideoElement, cb: DecodeCallback): Promise<void>;
+    reset?: () => void;
+  };
+
+  const codeReaderRef = useRef<BrowserQRCodeReaderType | null>(null);
+  const isRunningRef = useRef(false);
 
   // stable handler for scan results
   const handleScanResultCallback = useCallback(async (text: string) => {
@@ -41,6 +50,20 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
 
         if (invokeError || data?.error) {
           throw new Error(data?.error || invokeError.message);
+        }
+
+        // Stop scanner proactively before showing success UI
+        try {
+          if (codeReaderRef.current && isRunningRef.current) {
+            try {
+              codeReaderRef.current.reset?.();
+            } catch (errReset) {
+              // ignore reset errors
+              void errReset;
+            }
+          }
+        } catch (e) {
+          void e;
         }
 
         setStatus('success');
@@ -64,31 +87,40 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
     let mounted = true;
 
     const startScanner = async () => {
-      if (!scannerRef.current || !containerRef.current) return;
+      if (!containerRef.current || !scannerRef.current) return;
       try {
-        const mod = await import('html5-qrcode');
-        const Html5Qrcode = (mod as unknown as { Html5Qrcode: typeof import('html5-qrcode').Html5Qrcode }).Html5Qrcode;
+        const mod = await import('@zxing/browser');
         if (!mounted) return;
-        const elementId = `html5qr-scanner-${Math.random().toString(36).slice(2, 9)}`;
-        // give the inner element a stable id for the library
-        scannerRef.current.id = elementId;
-        const html5QrCode = new Html5Qrcode(elementId);
-        html5QrCodeRef.current = html5QrCode;
 
-        // compute a square qrbox based on container size
-        const rect = containerRef.current.getBoundingClientRect();
-        const minSide = Math.min(rect.width, rect.height);
-        const qrboxSize = Math.max(180, Math.floor(minSide * 0.75));
-
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: qrboxSize },
-          (decodedText: string) => handleScanResultCallback(decodedText),
-          (errorMessage: string) => {
-            // ignore per-frame errors
-            void errorMessage;
+        // create a video element (or reuse) inside the scanner wrapper
+        let videoEl = videoRef.current;
+        if (!videoEl) {
+          videoEl = document.createElement('video');
+          videoEl.setAttribute('playsInline', 'true');
+          videoEl.className = 'w-full h-full object-cover';
+          // empty the scannerRef and append the video
+          if (scannerRef.current) {
+            scannerRef.current.innerHTML = '';
+            scannerRef.current.appendChild(videoEl);
           }
-        );
+          videoRef.current = videoEl;
+        }
+
+        const { BrowserQRCodeReader } = mod as typeof import('@zxing/browser');
+  const codeReader = (new BrowserQRCodeReader() as unknown) as BrowserQRCodeReaderType;
+        codeReaderRef.current = codeReader;
+
+        // start decoding from the default camera, callback-based for responsiveness
+        await codeReader.decodeFromVideoDevice(undefined, videoEl, (result, error) => {
+          if (result && mounted) {
+            const text = (typeof result.getText === 'function') ? result.getText!() : (result.text ?? String(result));
+            void handleScanResultCallback(String(text));
+          }
+          // ignore frame errors
+          void error;
+        });
+
+        isRunningRef.current = true;
       } catch (err) {
         setStatus('error');
         setMessage((err as Error).message || 'No se pudo acceder a la cámara.');
@@ -103,11 +135,16 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
 
     return () => {
       mounted = false;
-      const instance = html5QrCodeRef.current;
-      if (instance && instance.stop) {
-        instance.stop().catch(() => undefined).finally(() => instance.clear && instance.clear());
+      const codeReader = codeReaderRef.current;
+      if (codeReader) {
+        try {
+          codeReader.reset?.();
+        } catch (e) {
+          void e;
+        }
       }
-      html5QrCodeRef.current = null;
+      codeReaderRef.current = null;
+      isRunningRef.current = false;
     };
   }, [isOpen, handleScanResultCallback]);
 
@@ -126,14 +163,15 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
 
             {/* Overlay: translucent edges with centered square cutout */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="relative" style={{ width: '75%', maxWidth: 420 }}>
+              <div className="relative w-[75%] max-w-[420px]">
                 <div className="absolute inset-0 bg-black/40 rounded-lg" />
-                <div className="mx-auto my-6" style={{ width: '100%', paddingTop: '100%', position: 'relative' }}>
-                  <div className="absolute inset-0 border-4 border-white rounded-md" />
-                  {/* animated scanline */}
-                  {status === 'scanning' && (
-                    <div className="absolute left-0 right-0 top-0 h-0.5 bg-white/80 animate-slide" style={{ transformOrigin: 'left' }} />
-                  )}
+                <div className="mx-auto my-6 w-full" style={{ paddingTop: '100%', position: 'relative' }}>
+                  <div className="absolute inset-0 border-4 border-white rounded-md overflow-hidden">
+                    {/* animated scanline */}
+                    {status === 'scanning' && (
+                      <div className="absolute left-0 right-0 top-0 h-0.5 bg-white/80 scanline" style={{ transformOrigin: 'left' }} />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -181,6 +219,16 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
           </div>
         </div>
       </DialogContent>
+      <style jsx>{`
+        .scanline {
+          animation: scan 2.6s linear infinite;
+        }
+        @keyframes scan {
+          0% { transform: translateY(0%); opacity: 0.9; }
+          45% { opacity: 1; }
+          100% { transform: translateY(100%); opacity: 0.6; }
+        }
+      `}</style>
     </Dialog>
   );
 }
