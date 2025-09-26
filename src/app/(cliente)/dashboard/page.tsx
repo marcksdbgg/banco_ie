@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { formatSoles } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import dynamic from 'next/dynamic';
+const DashboardQuickActions = dynamic(() => import('@/components/DashboardQuickActions'));
 import Link from "next/link";
 import { Banknote, Clock, DollarSign, Send } from "lucide-react";
 import Image from "next/image";
@@ -104,9 +106,12 @@ export default async function DashboardPage() {
               Nueva Transferencia
             </Link>
           </Button>
-          <Button variant="outline" className="hidden md:inline-flex">
-            <Banknote className="h-4 w-4 mr-2" /> Ver Historial
-          </Button>
+          <div className="hidden md:flex items-center">
+            <DashboardQuickActions />
+            <Button variant="outline" className="ml-2">
+              <Banknote className="h-4 w-4 mr-2" /> Ver Historial
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -190,7 +195,8 @@ export default async function DashboardPage() {
                 >
                   Nueva Transferencia
                 </Link>
-                <a className="text-sm text-gray-600">Ver Beneficiarios</a>
+                <Link href="/dashboard/amigos" className="text-sm text-blue-600 hover:underline">Amigos</Link>
+                <button onClick={() => { /* client component opens QR; keep a clear desktop/mobile CTA — fallback: navigate to amigos */ }} className="text-sm text-gray-600">Mi Código QR</button>
                 <a className="text-sm text-gray-600">Solicitar Ayuda</a>
               </div>
             </CardContent>
