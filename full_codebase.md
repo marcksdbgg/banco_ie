@@ -63,6 +63,8 @@ banco_ie/
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   ├── components
+│   │   ├── MyQrCodeDialog.tsx
+│   │   ├── QrScannerDialog.tsx
 │   │   ├── admin-guard.tsx
 │   │   ├── admin-navigation.tsx
 │   │   ├── client-guard.tsx
@@ -135,8 +137,10 @@ banco_ie/
     "clsx": "^2.1.0",
     "lucide-react": "^0.468.0",
     "next": "^15.5.3",
+    "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-qr-reader": "^3.0.0-beta-1",
     "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
@@ -527,6 +531,9 @@ export default function ComedorPage() {
 'use client';
 
 import { useState, useEffect } from 'react';
+import MyQrCodeDialog from '@/components/MyQrCodeDialog';
+import QrScannerDialog from '@/components/QrScannerDialog';
+import { QrCode, ScanLine } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -544,6 +551,9 @@ type Amistad = {
 };
 
 export default function AmigosPage() {
+    // ...existing state
+        const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+        const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [amistades, setAmistades] = useState<Amistad[]>([]);
     const [loading, setLoading] = useState(true);
@@ -653,6 +663,25 @@ export default function AmigosPage() {
                             {isSubmitting ? <Loader2 className="animate-spin" /> : 'Enviar Solicitud'}
                         </Button>
                     </form>
+
+                    {/* ADDITION: Separator and QR Code buttons */}
+                    <div className="relative my-4 flex items-center">
+                        <div className="flex-grow border-t border-gray-300"></div>
+                        <span className="flex-shrink mx-4 text-gray-400 text-xs">O</span>
+                        <div className="flex-grow border-t border-gray-300"></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Button variant="outline" onClick={() => setIsQrDialogOpen(true)}>
+                            <QrCode className="mr-2 h-4 w-4" />
+                            Mi Código QR
+                        </Button>
+                        <Button onClick={() => setIsScannerOpen(true)}>
+                            <ScanLine className="mr-2 h-4 w-4" />
+                            Escanear QR
+                        </Button>
+                    </div>
+
                     {error && <Alert variant="destructive" className="mt-4"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                     {success && <Alert variant="default" className="mt-4 bg-green-50 border-green-200"><CheckCircle className="h-4 w-4" /><AlertTitle>Éxito</AlertTitle><AlertDescription>{success}</AlertDescription></Alert>}
                 </CardContent>
@@ -705,6 +734,17 @@ export default function AmigosPage() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* ADDITION: Render the dialog component */}
+            <MyQrCodeDialog isOpen={isQrDialogOpen} onClose={() => setIsQrDialogOpen(false)} />
+            <QrScannerDialog
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScanSuccess={() => {
+                    // When a scan is successful, refresh the friends list
+                    if (user) fetchAmistades(user.id);
+                }}
+            />
         </div>
     );
 }
@@ -3144,6 +3184,188 @@ export default function ClientNavigation() {
         </div>
       </div>
     </header>
+  );
+}
+
+```
+
+## File: `src\components\MyQrCodeDialog.tsx`
+```tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { createClient } from '@/lib/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Loader2 } from 'lucide-react';
+
+type MyQrCodeDialogProps = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+type UserData = {
+  nombre_completo: string;
+  numero_cuenta: string;
+};
+
+export default function MyQrCodeDialog({ isOpen, onClose }: MyQrCodeDialogProps) {
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      const fetchUserData = async () => {
+        setLoading(true);
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data, error } = await supabase
+            .from('cuentas')
+            .select(`
+              numero_cuenta,
+              perfiles ( nombre_completo )
+            `)
+            .eq('usuario_id', user.id)
+            .single();
+          
+          if (data) {
+            setUserData({
+              numero_cuenta: data.numero_cuenta,
+              nombre_completo: Array.isArray(data.perfiles)
+                ? (data.perfiles[0] as { nombre_completo: string }).nombre_completo
+                : (data.perfiles as { nombre_completo: string }).nombre_completo,
+            });
+          }
+        }
+        setLoading(false);
+      };
+      fetchUserData();
+    }
+  }, [isOpen]);
+
+  // IMPORTANT: The value of the QR code should be a full URL to make it universally scannable.
+  const qrCodeValue = userData ? `${window.location.origin}/dashboard/amigos/add?account=${userData.numero_cuenta}` : '';
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Mi Código QR</DialogTitle>
+          <DialogDescription>
+            Pídele a tu amigo que escanee este código para añadirte.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col items-center justify-center p-4 gap-4">
+          {loading ? (
+            <Loader2 className="h-16 w-16 animate-spin" />
+          ) : userData ? (
+            <>
+              <QRCodeSVG
+                value={qrCodeValue}
+                size={256}
+                bgColor={"#ffffff"}
+                fgColor={"#000000"}
+                level={"L"}
+                includeMargin={true}
+              />
+              <div className="text-center">
+                <p className="font-bold text-lg">{userData.nombre_completo}</p>
+                <p className="text-sm text-gray-500 font-mono">{userData.numero_cuenta}</p>
+              </div>
+            </>
+          ) : (
+            <p>No se pudieron cargar los datos.</p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+```
+
+## File: `src\components\QrScannerDialog.tsx`
+```tsx
+'use client';
+
+import { useState } from 'react';
+import { QrReader } from 'react-qr-reader';
+import { createClient } from '@/lib/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+
+type QrScannerDialogProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onScanSuccess: () => void;
+};
+
+export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrScannerDialogProps) {
+  const [status, setStatus] = useState<'scanning' | 'loading' | 'success' | 'error'>('scanning');
+  const [message, setMessage] = useState('');
+
+  const handleScanResult = async (result: any, error: any) => {
+    if (!!result && status === 'scanning') {
+      setStatus('loading');
+      try {
+        const url = new URL(result.text);
+        const numeroCuenta = url.searchParams.get('account');
+
+        if (!numeroCuenta) {
+          throw new Error("Código QR no válido.");
+        }
+
+        const supabase = createClient();
+        const { data, error: invokeError } = await supabase.functions.invoke('solicitar-amistad', {
+          body: { numero_cuenta_amigo: numeroCuenta },
+        });
+
+        if (invokeError || data?.error) {
+          throw new Error(data?.error || invokeError.message);
+        }
+
+        setStatus('success');
+        setMessage(data.message);
+        setTimeout(() => {
+          onScanSuccess(); // Refresh the friends list
+          onClose();       // Close the dialog
+        }, 2000);
+
+      } catch (err) {
+        setStatus('error');
+        const error = err as Error;
+        setMessage(error.message || 'Ocurrió un error.');
+        // Reset after a delay so the user can try again
+        setTimeout(() => setStatus('scanning'), 3000);
+      }
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Escanear Código QR</DialogTitle></DialogHeader>
+        <div className="mt-4">
+          {status === 'scanning' && (
+            <QrReader
+              onResult={handleScanResult}
+              constraints={{ facingMode: 'environment' }}
+              className="w-full"
+            />
+          )}
+          {status === 'loading' && <Loader2 className="mx-auto h-16 w-16 animate-spin" />}
+          {status === 'success' && (
+            <Alert variant="default" className="bg-green-100"><CheckCircle /><AlertTitle>Éxito</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
+          )}
+          {status === 'error' && (
+            <Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
