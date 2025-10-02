@@ -2,13 +2,11 @@
 
 ```
 banco_ie/
-├── .env.local
 ├── .gitignore
 ├── SUPABASE_DATABASE.md
 ├── errores
 ├── eslint.config.mjs
 ├── export-codebase.py
-├── next-env.d.ts
 ├── next.config.ts
 ├── package.json
 ├── postcss.config.mjs
@@ -64,6 +62,8 @@ banco_ie/
 │   │   └── page.tsx
 │   ├── components
 │   │   ├── DashboardQuickActions.tsx
+│   │   ├── FriendSelector.tsx
+│   │   ├── MobileBottomNav.tsx
 │   │   ├── MyQrCodeDialog.tsx
 │   │   ├── QrScannerDialog.tsx
 │   │   ├── admin-guard.tsx
@@ -81,6 +81,8 @@ banco_ie/
 │   │       ├── label.tsx
 │   │       └── table.tsx
 │   ├── lib
+│   │   ├── hooks
+│   │   │   └── useFriends.ts
 │   │   ├── supabase
 │   │   │   ├── client.ts
 │   │   │   ├── database.types.ts
@@ -88,19 +90,9 @@ banco_ie/
 │   │   │   ├── op_atomicas.db
 │   │   │   └── server.ts
 │   │   └── utils.ts
-│   ├── middleware.ts
-│   └── types
-│       └── html5-qrcode.d.ts
+│   └── middleware.ts
 ├── supabase
 │   ├── .gitignore
-│   ├── .temp
-│   │   ├── cli-latest
-│   │   ├── gotrue-version
-│   │   ├── pooler-url
-│   │   ├── postgres-version
-│   │   ├── project-ref
-│   │   ├── rest-version
-│   │   └── storage-version
 │   ├── config.toml
 │   ├── functions
 │   │   ├── _shared
@@ -143,21 +135,21 @@ banco_ie/
     "@radix-ui/react-slot": "^1.1.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.2",
+    "@zxing/browser": "^0.0.10",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.468.0",
     "next": "^15.5.3",
-  "qrcode.react": "^4.2.0",
-  "react": "^19.0.0",
-  "react-dom": "^19.0.0",
-  "@zxing/browser": "^0.0.10",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
+    "@types/node": "^20.19.19",
+    "@types/react": "^19.2.0",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
@@ -197,13 +189,6 @@ banco_ie/
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules", "supabase/functions/**"]
 }
-
-```
-
-## File: `.env.local`
-```local
-NEXT_PUBLIC_SUPABASE_URL="TU_SUPABASE_URL"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="TU_SUPABASE_ANON_KEY"
 
 ```
 
@@ -393,17 +378,6 @@ def generate_codebase_markdown(base_path: str = ".", output_file: str = "full_co
 # If the script is run directly 
 if __name__ == "__main__":
     generate_codebase_markdown()
-```
-
-## File: `next-env.d.ts`
-```ts
-/// <reference types="next" />
-/// <reference types="next/image-types/global" />
-/// <reference path="./.next/types/routes.d.ts" />
-
-// NOTE: This file should not be edited
-// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
-
 ```
 
 ## File: `next.config.ts`
@@ -655,7 +629,8 @@ export default function AmigosPage() {
         }
     };
     
-    if (loading) return <div>Cargando...</div>;
+    // MODIFICATION: Improved loading state
+    if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     if (!user) return <div>No autenticado.</div>
 
     const amigosAceptados = amistades.filter(a => a.estado === 'aceptada');
@@ -664,7 +639,8 @@ export default function AmigosPage() {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-3xl font-bold">Mis Amigos</h1>
+            {/* MODIFICATION: Made font size responsive */}
+            <h1 className="text-2xl sm:text-3xl font-bold">Mis Amigos</h1>
 
             <Card>
                 <CardHeader>
@@ -672,12 +648,13 @@ export default function AmigosPage() {
                     <CardDescription>Ingresa el número de cuenta de 10 dígitos de tu amigo para enviarle una solicitud.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleAddFriend} className="flex items-end gap-4">
+                    {/* MODIFICATION: Made the form stack vertically on mobile */}
+                    <form onSubmit={handleAddFriend} className="flex flex-col sm:flex-row sm:items-end gap-4">
                         <div className="flex-grow">
                             <Label htmlFor="numero-cuenta">Número de Cuenta</Label>
                             <Input id="numero-cuenta" value={numeroCuenta} onChange={e => setNumeroCuenta(e.target.value)} placeholder="1234567890" required />
                         </div>
-                        <Button type="submit" disabled={isSubmitting}>
+                        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
                             {isSubmitting ? <Loader2 className="animate-spin" /> : 'Enviar Solicitud'}
                         </Button>
                     </form>
@@ -689,16 +666,15 @@ export default function AmigosPage() {
                         <div className="flex-grow border-t border-gray-300"></div>
                     </div>
 
+                    {/* MODIFICATION: Made buttons stack vertically on very small screens */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Button variant="outline" onClick={() => setIsQrDialogOpen(true)} className="w-full justify-center">
                             <QrCode className="mr-2 h-5 w-5" aria-hidden="true" />
-                            <span className="hidden sm:inline">Mi Código QR</span>
-                            <span className="sm:hidden">Mostrar QR</span>
+                            <span>Mi Código QR</span>
                         </Button>
                         <Button onClick={() => setIsScannerOpen(true)} className="w-full justify-center">
                             <ScanLine className="mr-2 h-5 w-5" aria-hidden="true" />
-                            <span className="hidden sm:inline">Escanear QR</span>
-                            <span className="sm:hidden">Escanear</span>
+                            <span>Escanear QR</span>
                         </Button>
                     </div>
 
@@ -778,8 +754,6 @@ import { redirect } from "next/navigation";
 import { formatSoles } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import dynamic from 'next/dynamic';
-const DashboardQuickActions = dynamic(() => import('@/components/DashboardQuickActions'));
 import Link from "next/link";
 import { Banknote, Clock, DollarSign, Send } from "lucide-react";
 import Image from "next/image";
@@ -866,12 +840,14 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+          {/* MODIFICATION: Made font size responsive */}
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
             Hola, {user.user_metadata.nombre_completo || "Estudiante"}
           </h1>
           <p className="text-gray-600">Bienvenido a tu portal financiero.</p>
         </div>
-        <div className="flex items-center gap-3">
+        {/* MODIFICATION: Hide the desktop-only buttons on mobile */}
+        <div className="hidden md:flex items-center gap-3">
           <Button asChild>
             <Link
               href="/dashboard/transferir"
@@ -881,12 +857,9 @@ export default async function DashboardPage() {
               Nueva Transferencia
             </Link>
           </Button>
-          <div className="hidden md:flex items-center">
-            <DashboardQuickActions />
-            <Button variant="outline" className="ml-2">
-              <Banknote className="h-4 w-4 mr-2" /> Ver Historial
-            </Button>
-          </div>
+          <Button variant="outline">
+            <Banknote className="h-4 w-4 mr-2" /> Ver Historial
+          </Button>
         </div>
       </div>
 
@@ -958,7 +931,8 @@ export default async function DashboardPage() {
         </div>
 
         <div className="space-y-4">
-          <Card>
+          {/* MODIFICATION: Hide the entire "Acciones Rápidas" card on mobile screens */}
+          <Card className="hidden lg:block">
             <CardHeader>
               <CardTitle>Acciones Rápidas</CardTitle>
             </CardHeader>
@@ -971,7 +945,6 @@ export default async function DashboardPage() {
                   Nueva Transferencia
                 </Link>
                 <Link href="/dashboard/amigos" className="text-sm text-blue-600 hover:underline">Amigos</Link>
-                <Link href="/dashboard/amigos" className="text-sm text-gray-600 hover:underline">Mi Código QR</Link>
                 <a className="text-sm text-gray-600">Solicitar Ayuda</a>
               </div>
             </CardContent>
@@ -1023,6 +996,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import FriendSelector from '@/components/FriendSelector';
 
 export default function TransferPage() {
     const router = useRouter();
@@ -1031,6 +1005,7 @@ export default function TransferPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+        const [selectedFriendName, setSelectedFriendName] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -1091,15 +1066,23 @@ export default function TransferPage() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
                             <Label htmlFor="numero-cuenta">Número de Cuenta de Destino</Label>
-                            <Input
-                                id="numero-cuenta"
-                                type="text"
-                                placeholder="Ej: 1234567890"
-                                value={numeroCuentaDestino}
-                                onChange={(e) => setNumeroCuentaDestino(e.target.value)}
-                                disabled={loading}
-                                required
-                            />
+                                <div className="space-y-2">
+                                    <FriendSelector onSelect={(numeroCuenta, friendName) => {
+                                        setNumeroCuentaDestino(numeroCuenta);
+                                        setSelectedFriendName(friendName || null);
+                                    }} disabled={loading} />
+
+                                    <Input
+                                        id="numero-cuenta"
+                                        type="text"
+                                        placeholder="Ej: 1234567890"
+                                        value={numeroCuentaDestino}
+                                        onChange={(e) => { setNumeroCuentaDestino(e.target.value); setSelectedFriendName(null); }}
+                                        disabled={loading}
+                                        required
+                                    />
+                                    {selectedFriendName && <div className="text-sm text-gray-600">Seleccionado: <strong>{selectedFriendName}</strong></div>}
+                                </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="monto">Monto a Transferir (S/.)</Label>
@@ -1108,7 +1091,16 @@ export default function TransferPage() {
                                 type="number"
                                 placeholder="Ej: 50.00"
                                 value={monto}
-                                onChange={(e) => setMonto(e.target.value)}
+                            const [selectedFriendName, setSelectedFriendName] = useState<string | null>(null);
+
+                            // Effect to pre-fill from URL for "Easy Transfer" link
+                            useEffect(() => {
+                                const destinatarioDesdeUrl = searchParams.get('destinatario');
+                                if (destinatarioDesdeUrl) {
+                                    setNumeroCuentaDestino(destinatarioDesdeUrl);
+                                }
+                            }, [searchParams]);
+
                                 disabled={loading}
                                 required
                                 min="0.01"
@@ -1177,7 +1169,7 @@ export default async function ClienteLayout({
   return (
     <>
       <ClientNavigation />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
         {children}
       </main>
     </>
@@ -3137,7 +3129,82 @@ export default function ClientGuard({ children }: { children: React.ReactNode })
 
 ## File: `src\components\client-navigation.tsx`
 ```tsx
+// ...existing code...
 "use client";
+
+import { useState, useEffect } from 'react';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { LogOut, Settings, ShoppingCart, Coffee, Users } from "lucide-react";
+import MobileBottomNav from './MobileBottomNav'; // Import our new component
+
+// The original top navigation bar is now its own component
+function DesktopNav() {
+  const router = useRouter();
+
+  async function handleSignOut() {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+  }
+
+  return (
+    <header className="bg-white border-b">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="text-lg font-bold">
+              ChitiBank
+            </Link>
+            <nav className="hidden md:flex items-center gap-4">
+              <Link href="/dashboard" className="text-sm text-gray-700 hover:text-gray-900">Dashboard</Link>
+              <Link href="/comedor" className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"><Coffee className="h-4 w-4" /> Comedor</Link>
+              <Link href="/bazar" className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Bazar</Link>
+              <Link href="/dashboard/amigos" className="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-2"><Users className="h-4 w-4" /> Amigos</Link>
+            </nav>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/transferir">
+              <Button variant="chiti_bank" size="sm">Nueva Transferencia</Button>
+            </Link>
+            <details className="relative">
+              <summary className="cursor-pointer text-sm text-gray-700 list-none">Mi Cuenta</summary>
+              <div className="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow-lg z-10">
+                <Link href="/perfil/configuracion" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"><Settings className="h-4 w-4" /> Configuración</Link>
+                <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"><LogOut className="h-4 w-4" /> Cerrar sesión</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// The main component now decides which navigation to show
+export default function ClientNavigation() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768); // 768px is Tailwind's 'md' breakpoint
+    };
+    
+    // Check on initial load
+    checkScreenSize();
+    
+    // Add event listener for screen resize
+    window.addEventListener('resize', checkScreenSize);
+    
+    // Cleanup event listener on component unmount
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  // Conditionally render the correct navigation component
+  return isMobile ? <MobileBottomNav /> : <DesktopNav />;
+}
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -3252,6 +3319,114 @@ export default function DashboardQuickActions() {
       <MyQrCodeDialog isOpen={isQrOpen} onClose={() => setIsQrOpen(false)} />
       <QrScannerDialog isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScanSuccess={() => setIsScannerOpen(false)} />
     </div>
+  );
+}
+
+```
+
+## File: `src\components\FriendSelector.tsx`
+```tsx
+"use client";
+
+import { useMemo, useState } from 'react';
+import useFriends from '@/lib/hooks/useFriends';
+import { Button } from './ui/button';
+
+type Props = { onSelect: (numeroCuenta: string, nombre?: string) => void; disabled?: boolean };
+
+export default function FriendSelector({ onSelect, disabled }: Props) {
+  const { friends, loading, refresh } = useFriends();
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => friends.filter(f => f.nombre_completo.toLowerCase().includes(query.toLowerCase())), [friends, query]);
+
+  return (
+    <div className="space-y-2">
+      <input
+        className="input"
+        placeholder="Buscar amigo por nombre"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+
+      <div className="bg-white border rounded-md p-2">
+        {loading && <div>Cargando amigos...</div>}
+        {!loading && filtered.length === 0 && <div className="text-sm text-muted-foreground">No hay amigos</div>}
+
+        {filtered.map(f => (
+          <div key={f.id} className="flex items-center justify-between p-2 border-b last:border-b-0">
+            <div>
+              <div className="font-semibold">{f.nombre_completo}</div>
+              <div className="text-sm text-muted-foreground">{f.numero_cuenta ?? 'Cuenta no disponible'}</div>
+            </div>
+            <div>
+              <Button size="sm" disabled={disabled || !f.numero_cuenta} onClick={() => onSelect(f.numero_cuenta ?? '', f.nombre_completo)}>Enviar</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" onClick={() => void refresh()}>Actualizar</Button>
+      </div>
+    </div>
+  );
+}
+
+
+```
+
+## File: `src\components\MobileBottomNav.tsx`
+```tsx
+"use client";
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { Home, ArrowRightLeft, Users, Menu } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+
+export default function MobileBottomNav() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/auth/login');
+  };
+  const navItems = [
+    { href: '/dashboard', icon: Home, label: 'Inicio' },
+    { href: '/dashboard/transferir', icon: ArrowRightLeft, label: 'Transferir' },
+    { href: '/dashboard/amigos', icon: Users, label: 'Amigos' },
+  ];
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 pb-safe">
+      <div className="flex justify-around items-center h-16">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link key={item.href} href={item.href} className={`flex flex-col items-center justify-center gap-1 w-full h-full text-sm transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}>
+              <item.icon className="h-6 w-6" />
+              <span className="text-xs">{item.label}</span>
+            </Link>
+          );
+        })}
+        {/* Menu/More Dropdown */}
+        <details className="relative flex flex-col items-center justify-center w-full h-full group">
+          <summary className="flex flex-col items-center justify-center gap-1 w-full h-full text-sm text-gray-500 cursor-pointer list-none">
+            <Menu className="h-6 w-6" />
+            <span className="text-xs">Más</span>
+          </summary>
+          <div className="absolute bottom-full mb-2 w-48 bg-white border rounded-md shadow-lg z-20 hidden group-open:block">
+            <Link href="/bazar" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Bazar</Link>
+            <Link href="/comedor" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Comedor</Link>
+            <button
+              onClick={handleSignOut}
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </details>
+      </div>
+    </nav>
   );
 }
 
@@ -3388,6 +3563,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+// using @zxing/browser dynamically (no direct import to avoid SSR issues)
 
 type QrScannerDialogProps = {
   isOpen: boolean;
@@ -3400,10 +3576,9 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
   const [message, setMessage] = useState('');
   const [manualCode, setManualCode] = useState('');
   const scannerRef = useRef<HTMLDivElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  type ZXingResult = { getText?: () => string; text?: string };
-  type DecodeCallback = (result: ZXingResult | null, error?: Error | null) => void;
+  type ZXingDecodeResult = { getText?: () => string; text?: string } | null;
+  type DecodeCallback = (result: ZXingDecodeResult, error?: Error | null) => void;
   type BrowserQRCodeReaderType = {
     decodeFromVideoDevice(deviceId: string | undefined, element: HTMLVideoElement, cb: DecodeCallback): Promise<void>;
     reset?: () => void;
@@ -3412,208 +3587,169 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
   const codeReaderRef = useRef<BrowserQRCodeReaderType | null>(null);
   const isRunningRef = useRef(false);
 
-  // stable handler for scan results
-  const handleScanResultCallback = useCallback(async (text: string) => {
-    if (text && status === 'scanning') {
-      setStatus('loading');
-      try {
-        const url = new URL(text ?? '');
-        const numeroCuenta = url.searchParams.get('account') ?? text; // accept plain number as fallback
+  const handleScanResult = useCallback(async (text: string) => {
+    if (!text) return;
+    if (status !== 'scanning') return;
+    setStatus('loading');
+    try {
+      const url = new URL(text, window.location.origin);
+      const numeroCuenta = url.searchParams.get('account') ?? text;
 
-        if (!numeroCuenta) {
-          throw new Error("Código QR no válido.");
-        }
+      if (!numeroCuenta) throw new Error('Código QR no válido o no contiene un número de cuenta.');
 
-        const supabase = createClient();
-        const { data, error: invokeError } = await supabase.functions.invoke('solicitar-amistad', {
-          body: { numero_cuenta_amigo: numeroCuenta },
-        });
+      const supabase = createClient();
+      const { data, error: invokeError } = await supabase.functions.invoke('solicitar-amistad', {
+        body: { numero_cuenta_amigo: numeroCuenta },
+      });
 
-        if (invokeError || data?.error) {
-          throw new Error(data?.error || invokeError.message);
-        }
+      if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
 
-        // Stop scanner proactively before showing success UI
-        try {
-          if (codeReaderRef.current && isRunningRef.current) {
-            try {
-              codeReaderRef.current.reset?.();
-            } catch (errReset) {
-              // ignore reset errors
-              void errReset;
-            }
-          }
-        } catch (e) {
-          void e;
-        }
+      // Stop reader proactively
+      try { codeReaderRef.current?.reset?.(); } catch (e) { void e; }
 
-        setStatus('success');
-        setMessage(data.message);
-        setTimeout(() => {
-          onScanSuccess(); // Refresh the friends list
-          onClose();       // Close the dialog
-        }, 2000);
-
-      } catch (caught) {
-        setStatus('error');
-        const error = caught as Error;
-        setMessage(error.message || 'Ocurrió un error.');
-        // Reset after a delay so the user can try again
-        setTimeout(() => setStatus('scanning'), 3000);
-      }
+      setStatus('success');
+      setMessage(data.message || 'Solicitud de amistad enviada correctamente.');
+      setTimeout(() => { onScanSuccess(); onClose(); }, 2000);
+    } catch (err) {
+      const error = err as Error;
+      setStatus('error');
+      setMessage(error.message || 'Ocurrió un error al procesar el código.');
+      setTimeout(() => setStatus('scanning'), 3000);
     }
   }, [status, onScanSuccess, onClose]);
 
+  // ...existing code...
+
+  const handleManualSubmit = async () => {
+    if (!manualCode.trim()) {
+      setMessage('Por favor, ingrese un número de cuenta.');
+      setStatus('error');
+      setTimeout(() => setStatus('scanning'), 3000);
+      return;
+    }
+    await handleScanResult(`${window.location.origin}/dashboard/amigos/add?account=${manualCode.trim()}`);
+  };
+
+  // start the ZXing reader when dialog opens
   useEffect(() => {
     let mounted = true;
-
-    const startScanner = async () => {
-      if (!containerRef.current || !scannerRef.current) return;
+    const start = async () => {
+      if (!scannerRef.current) return;
       try {
         const mod = await import('@zxing/browser');
         if (!mounted) return;
-
-        // create a video element (or reuse) inside the scanner wrapper
         let videoEl = videoRef.current;
         if (!videoEl) {
           videoEl = document.createElement('video');
           videoEl.setAttribute('playsInline', 'true');
           videoEl.className = 'w-full h-full object-cover';
-          // empty the scannerRef and append the video
-          if (scannerRef.current) {
-            scannerRef.current.innerHTML = '';
-            scannerRef.current.appendChild(videoEl);
-          }
+          scannerRef.current.innerHTML = '';
+          scannerRef.current.appendChild(videoEl);
           videoRef.current = videoEl;
         }
 
         const { BrowserQRCodeReader } = mod as typeof import('@zxing/browser');
-  const codeReader = (new BrowserQRCodeReader() as unknown) as BrowserQRCodeReaderType;
-        codeReaderRef.current = codeReader;
-
-        // start decoding from the default camera, callback-based for responsiveness
-        await codeReader.decodeFromVideoDevice(undefined, videoEl, (result, error) => {
+        const reader = (new BrowserQRCodeReader() as unknown) as BrowserQRCodeReaderType;
+        codeReaderRef.current = reader;
+        await reader.decodeFromVideoDevice(undefined, videoEl, (result, error) => {
           if (result && mounted) {
-            const text = (typeof result.getText === 'function') ? result.getText!() : (result.text ?? String(result));
-            void handleScanResultCallback(String(text));
+            let text: string;
+            if (typeof result.getText === 'function') {
+              text = result.getText();
+            } else {
+              text = (result?.text ?? String(result ?? '')) as string;
+            }
+            void handleScanResult(String(text));
           }
-          // ignore frame errors
           void error;
         });
-
         isRunningRef.current = true;
-      } catch (err) {
+      } catch (e) {
         setStatus('error');
-        setMessage((err as Error).message || 'No se pudo acceder a la cámara.');
+        setMessage((e as Error).message || 'No se pudo acceder a la cámara.');
       }
     };
 
-    if (isOpen) {
-      setStatus('scanning');
-      setMessage('');
-      startScanner();
-    }
+    if (isOpen && status === 'scanning') start();
 
     return () => {
       mounted = false;
-      const codeReader = codeReaderRef.current;
-      if (codeReader) {
-        try {
-          codeReader.reset?.();
-        } catch (e) {
-          void e;
-        }
-      }
+      try { codeReaderRef.current?.reset?.(); } catch (e) { void e; }
       codeReaderRef.current = null;
       isRunningRef.current = false;
     };
-  }, [isOpen, handleScanResultCallback]);
+  }, [isOpen, status, handleScanResult]);
 
-  // manual input will call handleScanResultCallback above
+  // Reset state when dialog is closed/opened
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+    setStatus('scanning');
+    setMessage('');
+    setManualCode('');
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg w-full">
-        <DialogHeader><DialogTitle>Escanear Código QR</DialogTitle></DialogHeader>
-
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md w-full">
+        <DialogHeader>
+          <DialogTitle>Escanear Código QR</DialogTitle>
+        </DialogHeader>
         <div className="mt-4 flex flex-col gap-4">
-          <p className="text-sm text-gray-600">Alinea el código QR dentro del área. Si la cámara no funciona, puedes ingresar el número de cuenta manualmente.</p>
+          <p className="text-sm text-gray-600">
+            Alinea el código QR dentro del área. Si la cámara no funciona, puedes ingresar el número de cuenta manualmente.
+          </p>
 
-          <div ref={containerRef} className="w-full bg-gray-50 rounded overflow-hidden relative">
-            <div ref={scannerRef} className="w-full h-64 sm:h-96 bg-black/10" />
-
-            {/* Overlay: translucent edges with centered square cutout */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="relative w-[75%] max-w-[420px]">
-                <div className="absolute inset-0 bg-black/40 rounded-lg" />
-                <div className="mx-auto my-6 w-full" style={{ paddingTop: '100%', position: 'relative' }}>
-                  <div className="absolute inset-0 border-4 border-white rounded-md overflow-hidden">
-                    {/* animated scanline */}
-                    {status === 'scanning' && (
-                      <div className="absolute left-0 right-0 top-0 h-0.5 bg-white/80 scanline" style={{ transformOrigin: 'left' }} />
-                    )}
-                  </div>
-                </div>
-              </div>
+          <div className="w-full h-80 bg-gray-900 rounded-lg overflow-hidden relative flex items-center justify-center">
+            <div ref={scannerRef} className="w-full h-full" />
+            
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-3/4 h-3/4 border-4 border-white/50 rounded-lg animate-pulse" />
             </div>
 
-            {status === 'loading' && <div className="p-6 flex justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div>}
-
+            {status === 'loading' && (
+              <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-white" />
+                <p className="text-white">Procesando...</p>
+              </div>
+            )}
+            
             {status === 'success' && (
-              <div className="p-6 flex flex-col items-center gap-3">
-                <div className="rounded-full bg-green-100 p-4">
-                  <CheckCircle className="h-8 w-8 text-green-700" />
-                </div>
-                <h3 className="text-lg font-semibold">Contacto agregado</h3>
-                <p className="text-sm text-gray-600 text-center">{message || 'Se añadió a tu lista de amigos correctamente.'}</p>
-                <div className="mt-3">
-                  <Button onClick={() => { onScanSuccess(); onClose(); }}>Cerrar</Button>
-                </div>
+              <div className="absolute inset-0 bg-green-600 flex flex-col items-center justify-center gap-3 p-4 text-white">
+                <CheckCircle className="h-12 w-12" />
+                <h3 className="text-lg font-semibold">¡Éxito!</h3>
+                <p className="text-sm text-center">{message}</p>
               </div>
             )}
 
             {status === 'error' && (
-              <div className="p-6">
-                <Alert variant="destructive"><AlertCircle /><AlertTitle>Error</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>
-              </div>
+               <div className="absolute bottom-4 left-4 right-4">
+                 <Alert variant="destructive">
+                   <AlertCircle className="h-4 w-4" />
+                   <AlertTitle>Error</AlertTitle>
+                   <AlertDescription>{message}</AlertDescription>
+                 </Alert>
+               </div>
             )}
           </div>
 
-          <div className="flex gap-2">
-            <Input placeholder="Número de cuenta (si no puedes escanear)" value={manualCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualCode(e.target.value)} />
-            <Button onClick={async () => {
-              if (!manualCode) return setMessage('Ingresa un número de cuenta.');
-              setStatus('loading');
-              try {
-                const supabase = createClient();
-                const { data, error: invokeError } = await supabase.functions.invoke('solicitar-amistad', { body: { numero_cuenta_amigo: manualCode } });
-                if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
-                setStatus('success');
-                setMessage(data.message);
-                setTimeout(() => { onScanSuccess(); onClose(); }, 2000);
-              } catch (err) {
-                setStatus('error');
-                setMessage((err as Error).message || 'Ocurrió un error.');
-                setTimeout(() => setStatus('scanning'), 3000);
-              }
-            }}>Enviar</Button>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Número de cuenta (si no puedes escanear)"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              disabled={status === 'loading' || status === 'success'}
+            />
+            <Button onClick={handleManualSubmit} disabled={status === 'loading' || status === 'success'}>
+              Enviar
+            </Button>
           </div>
         </div>
       </DialogContent>
-      <style jsx>{`
-        .scanline {
-          animation: scan 2.6s linear infinite;
-        }
-        @keyframes scan {
-          0% { transform: translateY(0%); opacity: 0.9; }
-          45% { opacity: 1; }
-          100% { transform: translateY(100%); opacity: 0.6; }
-        }
-      `}</style>
     </Dialog>
   );
 }
-
 ```
 
 ## File: `src\components\transaction\TransactionLine.tsx`
@@ -4182,6 +4318,96 @@ export {
 
 ```
 
+## File: `src\lib\hooks\useFriends.ts`
+```ts
+"use client";
+
+import { useCallback, useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+export type FriendInfo = { id: string; nombre_completo: string; numero_cuenta?: string };
+
+export default function useFriends() {
+  const [friends, setFriends] = useState<FriendInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  const fetchFriends = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const userId = userRes.user?.id;
+      if (!userId) { setFriends([]); setLoading(false); return; }
+
+      const { data: rows, error } = await supabase
+        .from('amistades')
+        .select(`
+          id,
+          estado,
+          solicitante:usuario_solicitante_id ( id, nombre_completo, cuentas ( numero_cuenta ) ),
+          receptor:usuario_receptor_id ( id, nombre_completo, cuentas ( numero_cuenta ) )
+        `)
+        .or(`usuario_solicitante_id.eq.${userId},usuario_receptor_id.eq.${userId}`)
+        .eq('estado', 'aceptada');
+
+      if (error) throw error;
+      const rowsArr = Array.isArray(rows) ? rows : [];
+      const list: FriendInfo[] = [];
+
+      for (const r of rowsArr) {
+        const row = r as Record<string, unknown>;
+        // normalize nested relations which Supabase may return as arrays
+        const solicitanteRaw = row.solicitante;
+        const receptorRaw = row.receptor;
+        const solicitanteObj = Array.isArray(solicitanteRaw) ? (solicitanteRaw as unknown[])[0] as Record<string, unknown> : (solicitanteRaw as Record<string, unknown> | undefined);
+        const receptorObj = Array.isArray(receptorRaw) ? (receptorRaw as unknown[])[0] as Record<string, unknown> : (receptorRaw as Record<string, unknown> | undefined);
+
+        // Determine which side is the friend (the other user)
+        const friendObj = (solicitanteObj && String(solicitanteObj.id) === userId) ? receptorObj : solicitanteObj;
+        const id = friendObj && friendObj.id ? String(friendObj.id) : '';
+        const nombre = friendObj && friendObj.nombre_completo ? String(friendObj.nombre_completo) : '';
+
+        // try to read numero_cuenta from nested 'cuentas' relation
+        let numero = '';
+        const cuentasRaw = friendObj?.cuentas;
+        const cuentasArr = Array.isArray(cuentasRaw) ? cuentasRaw as unknown[] : undefined;
+        if (cuentasArr && cuentasArr.length > 0) {
+          const c0 = cuentasArr[0] as Record<string, unknown>;
+          if (typeof c0?.numero_cuenta !== 'undefined') numero = String(c0.numero_cuenta);
+        }
+
+        // If numero not present, fallback to querying cuentas table directly by usuario_id
+        if (!numero && id) {
+          try {
+            const { data: cdata, error: cerr } = await supabase.from('cuentas').select('numero_cuenta').eq('usuario_id', id).single();
+                if (!cerr && cdata && typeof (cdata as Record<string, unknown>).numero_cuenta !== 'undefined') {
+                  numero = String(((cdata as Record<string, unknown>).numero_cuenta));
+                }
+          } catch {
+            // ignore
+          }
+        }
+
+        list.push({ id, nombre_completo: nombre, numero_cuenta: numero });
+      }
+
+      setFriends(list);
+    } catch {
+      setFriends([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    void fetchFriends();
+  }, [fetchFriends]);
+
+  return { friends, loading, refresh: fetchFriends } as const;
+}
+
+```
+
 ## File: `src\lib\supabase\client.ts`
 ```ts
 import { createBrowserClient } from '@supabase/ssr'
@@ -4404,31 +4630,6 @@ export const config = {
 
 ```
 
-## File: `src\types\html5-qrcode.d.ts`
-```ts
-declare module 'html5-qrcode' {
-  export type CameraConfig = { facingMode?: 'environment' | 'user' } | string;
-
-  export interface Html5QrcodeConfig {
-    fps?: number;
-    qrbox?: number | { width: number; height: number };
-  }
-
-  export class Html5Qrcode {
-    constructor(elementId: string | HTMLElement);
-    start(
-      cameraIdOrConfig: CameraConfig,
-      config?: Html5QrcodeConfig,
-      qrCodeSuccessCallback?: (decodedText: string) => void,
-      qrCodeErrorCallback?: (errorMessage: string) => void
-    ): Promise<void>;
-    stop(): Promise<void>;
-    clear(): void;
-  }
-}
-
-```
-
 ## File: `supabase\.gitignore`
 ```
 # Supabase
@@ -4440,41 +4641,6 @@ declare module 'html5-qrcode' {
 .env.local
 .env.*.local
 
-```
-
-## File: `supabase\.temp\cli-latest`
-```
-v2.39.2
-```
-
-## File: `supabase\.temp\gotrue-version`
-```
-v2.179.0
-```
-
-## File: `supabase\.temp\pooler-url`
-```
-postgresql://postgres.vimimyacwnhuiywgwwup:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:6543/postgres
-```
-
-## File: `supabase\.temp\postgres-version`
-```
-17.4.1.064
-```
-
-## File: `supabase\.temp\project-ref`
-```
-vimimyacwnhuiywgwwup
-```
-
-## File: `supabase\.temp\rest-version`
-```
-v12.2.12
-```
-
-## File: `supabase\.temp\storage-version`
-```
-v1.26.4
 ```
 
 ## File: `supabase\config.toml`

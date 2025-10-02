@@ -104,7 +104,16 @@ export default function TransferPage() {
                                 type="number"
                                 placeholder="Ej: 50.00"
                                 value={monto}
-                                onChange={(e) => setMonto(e.target.value)}
+                            const [selectedFriendName, setSelectedFriendName] = useState<string | null>(null);
+
+                            // Effect to pre-fill from URL for "Easy Transfer" link
+                            useEffect(() => {
+                                const destinatarioDesdeUrl = searchParams.get('destinatario');
+                                if (destinatarioDesdeUrl) {
+                                    setNumeroCuentaDestino(destinatarioDesdeUrl);
+                                }
+                            }, [searchParams]);
+
                                 disabled={loading}
                                 required
                                 min="0.01"

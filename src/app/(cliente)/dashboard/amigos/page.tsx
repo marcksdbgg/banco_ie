@@ -114,7 +114,8 @@ export default function AmigosPage() {
         }
     };
     
-    if (loading) return <div>Cargando...</div>;
+    // MODIFICATION: Improved loading state
+    if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     if (!user) return <div>No autenticado.</div>
 
     const amigosAceptados = amistades.filter(a => a.estado === 'aceptada');
@@ -123,7 +124,8 @@ export default function AmigosPage() {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-3xl font-bold">Mis Amigos</h1>
+            {/* MODIFICATION: Made font size responsive */}
+            <h1 className="text-2xl sm:text-3xl font-bold">Mis Amigos</h1>
 
             <Card>
                 <CardHeader>
@@ -131,12 +133,13 @@ export default function AmigosPage() {
                     <CardDescription>Ingresa el número de cuenta de 10 dígitos de tu amigo para enviarle una solicitud.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleAddFriend} className="flex items-end gap-4">
+                    {/* MODIFICATION: Made the form stack vertically on mobile */}
+                    <form onSubmit={handleAddFriend} className="flex flex-col sm:flex-row sm:items-end gap-4">
                         <div className="flex-grow">
                             <Label htmlFor="numero-cuenta">Número de Cuenta</Label>
                             <Input id="numero-cuenta" value={numeroCuenta} onChange={e => setNumeroCuenta(e.target.value)} placeholder="1234567890" required />
                         </div>
-                        <Button type="submit" disabled={isSubmitting}>
+                        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
                             {isSubmitting ? <Loader2 className="animate-spin" /> : 'Enviar Solicitud'}
                         </Button>
                     </form>
@@ -148,16 +151,15 @@ export default function AmigosPage() {
                         <div className="flex-grow border-t border-gray-300"></div>
                     </div>
 
+                    {/* MODIFICATION: Made buttons stack vertically on very small screens */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Button variant="outline" onClick={() => setIsQrDialogOpen(true)} className="w-full justify-center">
                             <QrCode className="mr-2 h-5 w-5" aria-hidden="true" />
-                            <span className="hidden sm:inline">Mi Código QR</span>
-                            <span className="sm:hidden">Mostrar QR</span>
+                            <span>Mi Código QR</span>
                         </Button>
                         <Button onClick={() => setIsScannerOpen(true)} className="w-full justify-center">
                             <ScanLine className="mr-2 h-5 w-5" aria-hidden="true" />
-                            <span className="hidden sm:inline">Escanear QR</span>
-                            <span className="sm:hidden">Escanear</span>
+                            <span>Escanear QR</span>
                         </Button>
                     </div>
 

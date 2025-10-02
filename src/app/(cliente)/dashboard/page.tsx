@@ -3,8 +3,6 @@ import { redirect } from "next/navigation";
 import { formatSoles } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import dynamic from 'next/dynamic';
-const DashboardQuickActions = dynamic(() => import('@/components/DashboardQuickActions'));
 import Link from "next/link";
 import { Banknote, Clock, DollarSign, Send } from "lucide-react";
 import Image from "next/image";
@@ -91,12 +89,14 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+          {/* MODIFICATION: Made font size responsive */}
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
             Hola, {user.user_metadata.nombre_completo || "Estudiante"}
           </h1>
           <p className="text-gray-600">Bienvenido a tu portal financiero.</p>
         </div>
-        <div className="flex items-center gap-3">
+        {/* MODIFICATION: Hide the desktop-only buttons on mobile */}
+        <div className="hidden md:flex items-center gap-3">
           <Button asChild>
             <Link
               href="/dashboard/transferir"
@@ -106,12 +106,9 @@ export default async function DashboardPage() {
               Nueva Transferencia
             </Link>
           </Button>
-          <div className="hidden md:flex items-center">
-            <DashboardQuickActions />
-            <Button variant="outline" className="ml-2">
-              <Banknote className="h-4 w-4 mr-2" /> Ver Historial
-            </Button>
-          </div>
+          <Button variant="outline">
+            <Banknote className="h-4 w-4 mr-2" /> Ver Historial
+          </Button>
         </div>
       </div>
 
@@ -183,7 +180,8 @@ export default async function DashboardPage() {
         </div>
 
         <div className="space-y-4">
-          <Card>
+          {/* MODIFICATION: Hide the entire "Acciones Rápidas" card on mobile screens */}
+          <Card className="hidden lg:block">
             <CardHeader>
               <CardTitle>Acciones Rápidas</CardTitle>
             </CardHeader>
@@ -196,7 +194,6 @@ export default async function DashboardPage() {
                   Nueva Transferencia
                 </Link>
                 <Link href="/dashboard/amigos" className="text-sm text-blue-600 hover:underline">Amigos</Link>
-                <Link href="/dashboard/amigos" className="text-sm text-gray-600 hover:underline">Mi Código QR</Link>
                 <a className="text-sm text-gray-600">Solicitar Ayuda</a>
               </div>
             </CardContent>
