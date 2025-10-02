@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,16 @@ export default function TransferPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
-        const [selectedFriendName, setSelectedFriendName] = useState<string | null>(null);
+    const [selectedFriendName, setSelectedFriendName] = useState<string | null>(null);
+    const searchParams = useSearchParams();
+
+    // Effect to pre-fill from URL for "Easy Transfer" link
+    useEffect(() => {
+        const destinatarioDesdeUrl = searchParams.get('destinatario');
+        if (destinatarioDesdeUrl) {
+            setNumeroCuentaDestino(destinatarioDesdeUrl);
+        }
+    }, [searchParams]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -104,7 +113,6 @@ export default function TransferPage() {
                                 type="number"
                                 placeholder="Ej: 50.00"
                                 value={monto}
-                                onChange={(e) => setMonto(e.target.value)}
                                 disabled={loading}
                                 required
                                 min="0.01"

@@ -8,14 +8,17 @@ export type FriendInfo = { id: string; nombre_completo: string; numero_cuenta?: 
 export default function useFriends() {
   const [friends, setFriends] = useState<FriendInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
   const fetchFriends = useCallback(async () => {
     setLoading(true);
+    // create client inside function to avoid unstable closure deps
+    const supabase = createClient();
     try {
       const { data: userRes } = await supabase.auth.getUser();
       const userId = userRes.user?.id;
-      if (!userId) { setFriends([]); setLoading(false); return; }
+      if (!userId) {
+        setFriends([]);
+        return;
+      }
 
       const { data: rows, error } = await supabase
         .from('amistades')
@@ -31,16 +34,19 @@ export default function useFriends() {
       if (error) throw error;
       const rowsArr = Array.isArray(rows) ? rows : [];
       const list: FriendInfo[] = [];
+      const idsMissingNumero: string[] = [];
 
       for (const r of rowsArr) {
         const row = r as Record<string, unknown>;
-        // normalize nested relations which Supabase may return as arrays
         const solicitanteRaw = row.solicitante;
         const receptorRaw = row.receptor;
-        const solicitanteObj = Array.isArray(solicitanteRaw) ? (solicitanteRaw as unknown[])[0] as Record<string, unknown> : (solicitanteRaw as Record<string, unknown> | undefined);
-        const receptorObj = Array.isArray(receptorRaw) ? (receptorRaw as unknown[])[0] as Record<string, unknown> : (receptorRaw as Record<string, unknown> | undefined);
+        const solicitanteObj = Array.isArray(solicitanteRaw)
+          ? (solicitanteRaw as unknown[])[0] as Record<string, unknown>
+          : (solicitanteRaw as Record<string, unknown> | undefined);
+        const receptorObj = Array.isArray(receptorRaw)
+          ? (receptorRaw as unknown[])[0] as Record<string, unknown>
+          : (receptorRaw as Record<string, unknown> | undefined);
 
-        // Determine which side is the friend (the other user)
         const friendObj = (solicitanteObj && String(solicitanteObj.id) === userId) ? receptorObj : solicitanteObj;
         const id = friendObj && friendObj.id ? String(friendObj.id) : '';
         const nombre = friendObj && friendObj.nombre_completo ? String(friendObj.nombre_completo) : '';
@@ -54,28 +60,51 @@ export default function useFriends() {
           if (typeof c0?.numero_cuenta !== 'undefined') numero = String(c0.numero_cuenta);
         }
 
-        // If numero not present, fallback to querying cuentas table directly by usuario_id
-        if (!numero && id) {
-          try {
-            const { data: cdata, error: cerr } = await supabase.from('cuentas').select('numero_cuenta').eq('usuario_id', id).single();
-                if (!cerr && cdata && typeof (cdata as Record<string, unknown>).numero_cuenta !== 'undefined') {
-                  numero = String(((cdata as Record<string, unknown>).numero_cuenta));
-                }
-          } catch {
-            // ignore
-          }
-        }
+        if (!numero && id) idsMissingNumero.push(id);
 
         list.push({ id, nombre_completo: nombre, numero_cuenta: numero });
       }
 
+      // If some friends lack numero_cuenta, fetch them in a single query
+      if (idsMissingNumero.length > 0) {
+        try {
+          const { data: cuentasData, error: cuentasErr } = await supabase
+            .from('cuentas')
+            .select('usuario_id, numero_cuenta')
+            .in('usuario_id', idsMissingNumero);
+
+          if (!cuentasErr && Array.isArray(cuentasData)) {
+            const mapByUser: Record<string, string> = {};
+            for (const c of cuentasData as unknown[]) {
+              const cr = c as Record<string, unknown>;
+              const uid = cr.usuario_id ? String(cr.usuario_id) : '';
+              const num = typeof cr.numero_cuenta !== 'undefined' ? String(cr.numero_cuenta) : '';
+              if (uid) mapByUser[uid] = num;
+            }
+
+            // fill missing numeros in list
+            for (const f of list) {
+              if (!f.numero_cuenta && f.id && mapByUser[f.id]) {
+                f.numero_cuenta = mapByUser[f.id];
+              }
+            }
+          }
+        } catch (err) {
+          // Log but don't fail the whole fetch
+          // eslint-disable-next-line no-console
+          console.error('Error fetching cuentas for friends:', err);
+        }
+      }
+
       setFriends(list);
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching friends:', err);
       setFriends([]);
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     void fetchFriends();
