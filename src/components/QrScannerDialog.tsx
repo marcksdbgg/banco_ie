@@ -12,10 +12,20 @@ import { Button } from '@/components/ui/button';
 type QrScannerDialogProps = {
   isOpen: boolean;
   onClose: () => void;
-  onScanSuccess: () => void;
+  onScanSuccess?: () => void;
+  mode?: 'friend' | 'transfer';
+  onAccountDetected?: (numeroCuenta: string) => Promise<void> | void;
+  transferSuccessMessage?: string;
 };
 
-export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrScannerDialogProps) {
+export default function QrScannerDialog({
+  isOpen,
+  onClose,
+  onScanSuccess,
+  mode = 'friend',
+  onAccountDetected,
+  transferSuccessMessage,
+}: QrScannerDialogProps) {
   const [status, setStatus] = useState<'scanning' | 'loading' | 'success' | 'error'>('scanning');
   const [message, setMessage] = useState('');
   const [manualCode, setManualCode] = useState('');
@@ -36,34 +46,60 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
     if (status !== 'scanning') return;
     setStatus('loading');
     try {
-      const url = new URL(text, window.location.origin);
-      const numeroCuenta = url.searchParams.get('account') ?? text;
+      let numeroCuenta = '';
+      try {
+        const url = new URL(text, window.location.origin);
+        numeroCuenta =
+          url.searchParams.get('account') ??
+          url.searchParams.get('numero_cuenta') ??
+          url.searchParams.get('numeroCuenta') ??
+          '';
+        if (!numeroCuenta) {
+          const pathSegment = url.pathname.split('/').filter(Boolean).pop();
+          if (pathSegment && /\d{6,}/.test(pathSegment)) numeroCuenta = pathSegment;
+        }
+      } catch (e) {
+        void e;
+        numeroCuenta = text;
+      }
 
-      if (!numeroCuenta) throw new Error('Código QR no válido o no contiene un número de cuenta.');
+      numeroCuenta = numeroCuenta.trim();
+      if (!numeroCuenta) throw new Error('Código QR no válido o sin número de cuenta.');
 
-      const supabase = createClient();
-      const { data, error: invokeError } = await supabase.functions.invoke('solicitar-amistad', {
-        body: { numero_cuenta_amigo: numeroCuenta },
-      });
+      if (mode === 'friend') {
+        const supabase = createClient();
+        const { data, error: invokeError } = await supabase.functions.invoke('solicitar-amistad', {
+          body: { numero_cuenta_amigo: numeroCuenta },
+        });
 
-      if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+        if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
 
-      // Stop reader proactively
-      try { codeReaderRef.current?.reset?.(); } catch (e) { void e; }
+        try { codeReaderRef.current?.reset?.(); } catch (e) { void e; }
 
-      setStatus('success');
-      setMessage(data.message || 'Solicitud de amistad enviada correctamente.');
-      setTimeout(() => { onScanSuccess(); onClose(); }, 2000);
+        setStatus('success');
+        setMessage(data.message || 'Solicitud de amistad enviada correctamente.');
+        setTimeout(() => {
+          onScanSuccess?.();
+          onClose();
+        }, 2000);
+      } else {
+        if (!onAccountDetected) throw new Error('No se configuró el manejo del número de cuenta.');
+        await Promise.resolve(onAccountDetected(numeroCuenta));
+        try { codeReaderRef.current?.reset?.(); } catch (e) { void e; }
+        setStatus('success');
+        setMessage(transferSuccessMessage || 'Número de cuenta detectado. Completa la transferencia.');
+        setTimeout(() => {
+          onScanSuccess?.();
+          onClose();
+        }, 1500);
+      }
     } catch (err) {
       const error = err as Error;
       setStatus('error');
       setMessage(error.message || 'Ocurrió un error al procesar el código.');
       setTimeout(() => setStatus('scanning'), 3000);
     }
-  }, [status, onScanSuccess, onClose]);
-
-  // ...existing code...
-
+  }, [status, onScanSuccess, onClose, mode, onAccountDetected, transferSuccessMessage]);
   const handleManualSubmit = async () => {
     if (!manualCode.trim()) {
       setMessage('Por favor, ingrese un número de cuenta.');
@@ -71,7 +107,12 @@ export default function QrScannerDialog({ isOpen, onClose, onScanSuccess }: QrSc
       setTimeout(() => setStatus('scanning'), 3000);
       return;
     }
-    await handleScanResult(`${window.location.origin}/dashboard/amigos/add?account=${manualCode.trim()}`);
+    const cleanValue = manualCode.trim();
+    if (mode === 'friend') {
+      await handleScanResult(`${window.location.origin}/dashboard/amigos/add?account=${cleanValue}`);
+    } else {
+      await handleScanResult(cleanValue);
+    }
   };
 
   // start the ZXing reader when dialog opens

@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import MyQrCodeDialog from '@/components/MyQrCodeDialog';
 import QrScannerDialog from '@/components/QrScannerDialog';
-import { QrCode, ScanLine } from 'lucide-react';
+import { QrCode, ScanLine, UsersRound } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UserPlus, Loader2, AlertCircle, CheckCircle, X, Check } from 'lucide-react';
+import { UserPlus, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 
 type Amistad = {
@@ -21,9 +21,8 @@ type Amistad = {
 };
 
 export default function AmigosPage() {
-    // ...existing state
-        const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
-        const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [amistades, setAmistades] = useState<Amistad[]>([]);
     const [loading, setLoading] = useState(true);
@@ -123,106 +122,198 @@ export default function AmigosPage() {
     const solicitudesEnviadas = amistades.filter(a => a.estado === 'pendiente' && a.solicitante.id === user.id);
 
     return (
-        <div className="space-y-6">
-            {/* MODIFICATION: Made font size responsive */}
-            <h1 className="text-2xl sm:text-3xl font-bold">Mis Amigos</h1>
+        <div className="space-y-10">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold">Mis Amigos</h1>
+                    <p className="text-sm text-gray-500 sm:text-base">Administra tus contactos y comienza transferencias en segundos.</p>
+                </div>
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsQrDialogOpen(true)}>
+                    <QrCode className="mr-2 h-4 w-4" /> Mostrar mi QR
+                </Button>
+            </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center"><UserPlus className="mr-2" />Añadir Amigo</CardTitle>
-                    <CardDescription>Ingresa el número de cuenta de 10 dígitos de tu amigo para enviarle una solicitud.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {/* MODIFICATION: Made the form stack vertically on mobile */}
-                    <form onSubmit={handleAddFriend} className="flex flex-col sm:flex-row sm:items-end gap-4">
-                        <div className="flex-grow">
-                            <Label htmlFor="numero-cuenta">Número de Cuenta</Label>
-                            <Input id="numero-cuenta" value={numeroCuenta} onChange={e => setNumeroCuenta(e.target.value)} placeholder="1234567890" required />
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+                <Card className="order-1 lg:order-none">
+                    <CardHeader>
+                        <CardTitle className="flex items-center text-lg sm:text-xl">
+                            <UserPlus className="mr-2 h-5 w-5" />Añade un amigo en segundos
+                        </CardTitle>
+                        <CardDescription>
+                            Prioriza el escaneo de códigos para conectarte más rápido. También puedes compartir el tuyo.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Button
+                                className="h-auto justify-start space-x-3 rounded-xl border-2 border-transparent px-5 py-4 text-left text-base font-semibold shadow-sm hover:border-chiti_bank-blue"
+                                onClick={() => setIsScannerOpen(true)}
+                            >
+                                <ScanLine className="h-6 w-6" />
+                                <span>Escanear código
+                                    <span className="block text-xs font-normal text-white/80 sm:text-sm">Invita a tu amigo y acepta desde su tarjeta digital.</span>
+                                </span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-auto justify-start space-x-3 rounded-xl px-5 py-4 text-left text-base font-semibold"
+                                onClick={() => setIsQrDialogOpen(true)}
+                            >
+                                <QrCode className="h-6 w-6" />
+                                <span>Compartir mi QR
+                                    <span className="block text-xs font-normal text-gray-500 sm:text-sm">Enséñales tu tarjeta virtual y listo.</span>
+                                </span>
+                            </Button>
                         </div>
-                        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
-                            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Enviar Solicitud'}
-                        </Button>
-                    </form>
 
-                    {/* ADDITION: Separator and QR Code buttons */}
-                    <div className="relative my-4 flex items-center">
-                        <div className="flex-grow border-t border-gray-300"></div>
-                        <span className="flex-shrink mx-4 text-gray-400 text-xs">O</span>
-                        <div className="flex-grow border-t border-gray-300"></div>
-                    </div>
-
-                    {/* MODIFICATION: Made buttons stack vertically on very small screens */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Button variant="outline" onClick={() => setIsQrDialogOpen(true)} className="w-full justify-center">
-                            <QrCode className="mr-2 h-5 w-5" aria-hidden="true" />
-                            <span>Mi Código QR</span>
-                        </Button>
-                        <Button onClick={() => setIsScannerOpen(true)} className="w-full justify-center">
-                            <ScanLine className="mr-2 h-5 w-5" aria-hidden="true" />
-                            <span>Escanear QR</span>
-                        </Button>
-                    </div>
-
-                    {error && <Alert variant="destructive" className="mt-4"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-                    {success && <Alert variant="default" className="mt-4 bg-green-50 border-green-200"><CheckCircle className="h-4 w-4" /><AlertTitle>Éxito</AlertTitle><AlertDescription>{success}</AlertDescription></Alert>}
-                </CardContent>
-            </Card>
-
-            {solicitudesRecibidas.length > 0 && (
-                <Card>
-                    <CardHeader><CardTitle>Solicitudes de Amistad Recibidas</CardTitle></CardHeader>
-                    <CardContent>
-                        {solicitudesRecibidas.map(req => (
-                            <div key={req.id} className="flex items-center justify-between p-2 border-b">
-                                <span>{req.solicitante.nombre_completo}</span>
-                                <div className="flex gap-2">
-                                    <Button size="icon" variant="outline" className="text-green-600" onClick={() => handleManageRequest(req.id, 'aceptar')}><Check /></Button>
-                                    <Button size="icon" variant="destructive" onClick={() => handleManageRequest(req.id, 'rechazar')}><X /></Button>
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-5">
+                            <p className="text-sm font-semibold text-gray-700">¿Necesitas ingresar el número de cuenta?</p>
+                            <p className="mb-4 text-xs text-gray-500 sm:text-sm">Utiliza esta opción solo si tu amigo no tiene su código QR a la mano.</p>
+                            <form onSubmit={handleAddFriend} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                <div className="flex-grow">
+                                    <Label htmlFor="numero-cuenta">Número de cuenta (10 dígitos)</Label>
+                                    <Input
+                                        id="numero-cuenta"
+                                        value={numeroCuenta}
+                                        onChange={e => setNumeroCuenta(e.target.value)}
+                                        placeholder="1234567890"
+                                        inputMode="numeric"
+                                        pattern="[0-9]{10}"
+                                        required
+                                    />
                                 </div>
-                            </div>
-                        ))}
+                                <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+                                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar solicitud'}
+                                </Button>
+                            </form>
+                        </div>
+
+                        {error && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Error</AlertTitle>
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+                        {success && (
+                            <Alert variant="default" className="bg-green-50 border-green-200">
+                                <CheckCircle className="h-4 w-4 text-chiti_bank-green" />
+                                <AlertTitle>Éxito</AlertTitle>
+                                <AlertDescription>{success}</AlertDescription>
+                            </Alert>
+                        )}
                     </CardContent>
                 </Card>
-            )}
 
-            <Card>
-                <CardHeader><CardTitle>Lista de Amigos ({amigosAceptados.length})</CardTitle></CardHeader>
-                <CardContent>
-                    {amigosAceptados.length > 0 ? (
-                        amigosAceptados.map(amigo => {
-                            const amigoInfo = amigo.solicitante.id === user.id ? amigo.receptor : amigo.solicitante;
-                            return (
-                                <div key={amigo.id} className="flex items-center justify-between p-2 border-b">
-                                    <span>{amigoInfo.nombre_completo}</span>
-                                    <Button size="sm" variant="destructive" onClick={() => handleManageRequest(amigo.id, 'eliminar')}>Eliminar</Button>
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader className="pb-0">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <CardTitle className="text-lg sm:text-xl">Lista de amigos</CardTitle>
+                                    <CardDescription>Personas con las que ya puedes transferir.</CardDescription>
                                 </div>
-                            );
-                        })
-                    ) : <p className="text-gray-500">Aún no tienes amigos. ¡Añade uno!</p>}
-                </CardContent>
-            </Card>
-
-            {solicitudesEnviadas.length > 0 && (
-                 <Card>
-                    <CardHeader><CardTitle>Solicitudes Enviadas Pendientes</CardTitle></CardHeader>
-                    <CardContent>
-                        {solicitudesEnviadas.map(req => (
-                            <div key={req.id} className="flex items-center justify-between p-2 border-b">
-                                <span>{req.receptor.nombre_completo}</span>
-                                <span className="text-sm text-gray-500">Pendiente</span>
+                                <span className="rounded-full bg-chiti_bank-blue/10 px-3 py-1 text-sm font-medium text-chiti_bank-blue">
+                                    {amigosAceptados.length}
+                                </span>
                             </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            )}
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {amigosAceptados.length > 0 ? (
+                                <ul className="divide-y border-t">
+                                    {amigosAceptados.map(amigo => {
+                                        const amigoInfo = amigo.solicitante.id === user.id ? amigo.receptor : amigo.solicitante;
+                                        return (
+                                            <li key={amigo.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <UsersRound className="hidden h-9 w-9 rounded-full bg-chiti_bank-blue/10 p-2 text-chiti_bank-blue sm:block" />
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900">{amigoInfo.nombre_completo}</p>
+                                                        <p className="text-xs text-gray-500 sm:text-sm">Contacto activo</p>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="justify-center border-red-200 text-red-600 hover:bg-red-50"
+                                                    onClick={() => handleManageRequest(amigo.id, 'eliminar')}
+                                                >
+                                                    Eliminar
+                                                </Button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            ) : (
+                                <div className="flex flex-col items-center gap-3 px-5 py-12 text-center">
+                                    <UsersRound className="h-10 w-10 text-gray-300" />
+                                    <p className="text-sm text-gray-500">Aún no tienes amigos conectados. Escanea un código para comenzar.</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
-            {/* ADDITION: Render the dialog component */}
+                    {solicitudesRecibidas.length > 0 && (
+                        <Card>
+                            <CardHeader className="pb-0">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg">Solicitudes recibidas</CardTitle>
+                                    <span className="text-sm font-semibold text-gray-500">{solicitudesRecibidas.length}</span>
+                                </div>
+                                <CardDescription>Confirma quién puede aparecer en tu lista.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4 pt-4">
+                                {solicitudesRecibidas.map(req => (
+                                    <div key={req.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="font-semibold text-gray-900">{req.solicitante.nombre_completo}</p>
+                                            <p className="text-xs text-gray-500 sm:text-sm">Te envió una invitación</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                className="bg-chiti_bank-green text-white hover:bg-chiti_bank-green/90"
+                                                onClick={() => handleManageRequest(req.id, 'aceptar')}
+                                            >
+                                                Aceptar
+                                            </Button>
+                                            <Button size="sm" variant="outline" onClick={() => handleManageRequest(req.id, 'rechazar')}>
+                                                Rechazar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {solicitudesEnviadas.length > 0 && (
+                        <Card>
+                            <CardHeader className="pb-0">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg">Solicitudes enviadas</CardTitle>
+                                    <span className="text-sm font-semibold text-gray-500">{solicitudesEnviadas.length}</span>
+                                </div>
+                                <CardDescription>Esperando confirmación.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3 pt-4">
+                                {solicitudesEnviadas.map(req => (
+                                    <div key={req.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                                        <span className="font-medium text-gray-900">{req.receptor.nombre_completo}</span>
+                                        <span className="text-xs uppercase tracking-wide text-gray-400">Pendiente</span>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            </div>
+
             <MyQrCodeDialog isOpen={isQrDialogOpen} onClose={() => setIsQrDialogOpen(false)} />
             <QrScannerDialog
                 isOpen={isScannerOpen}
                 onClose={() => setIsScannerOpen(false)}
                 onScanSuccess={() => {
-                    // When a scan is successful, refresh the friends list
                     if (user) fetchAmistades(user.id);
                 }}
             />
