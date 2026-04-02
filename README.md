@@ -9,8 +9,8 @@
 
  **Resumen del sistema:**
  - Frontend: Next.js con App Router + TypeScript + Tailwind CSS (shadcn/ui components).
- - Backend: Supabase Auth + Postgres + Edge Functions (Deno) para lógica crítica transaccional.
- - Despliegue: Vercel (frontend) y Supabase (Edge Functions + DB).
+ - Backend: Supabase Auth + Neon Postgres + API Routes de Next.js para lógica crítica transaccional.
+ - Despliegue: Vercel (frontend + API) y Neon (DB). Supabase se mantiene para Auth.
 
  --
 
@@ -134,6 +134,7 @@
      - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anon public key (solo para client SDK).
  - Para server-side (Vercel/Server routes):
      - `SUPABASE_SERVICE_ROLE_KEY` — clave con privilegios server (NO exponer al cliente).
+     - `DATABASE_URL` — connection string de Neon para consultas SQL y operaciones transaccionales.
     - `ADMIN_CREATE_SECRET` — (opcional/legacy) secreto que se usaba cuando se proxyaba la llamada a través de un endpoint server-side. Con la llamada directa desde el admin UI a la Edge Function, este secreto no es estrictamente necesario; la función valida Authorization Bearer tokens o `x-admin-secret` si configurado.
  - Para Supabase Functions (en el dashboard de Supabase):
      - `SUPABASE_URL`
@@ -162,6 +163,7 @@
  NEXT_PUBLIC_SUPABASE_URL=<your_supabase_url>
  NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_anon_key>
  SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
+ DATABASE_URL=<your_neon_connection_string>
 # ADMIN_CREATE_SECRET is optional and only needed if you use a proxy flow
 # ADMIN_CREATE_SECRET=<random_secret_for_admin_calls>
  ```
@@ -327,5 +329,4 @@ Flujo principal que implementa la función:
 9. Si `saldo_inicial > 0` registra una transacción inicial en `transacciones`.
 10. Devuelve 201 en caso de éxito con `{ userId, message }`, o 400 con `{ error }` en error.
 
-Nota de seguridad: la función requiere `SUPABASE_SERVICE_ROLE_KEY` en sus env vars; en producción asegúrate de guardarla en el dashboard de Supabase y no en el repositorio.
-
+Nota de seguridad: la ruta API requiere `SUPABASE_SERVICE_ROLE_KEY` para operaciones administrativas de Auth; en producción debe almacenarse como variable de entorno del backend (por ejemplo en Vercel), nunca en el repositorio ni en el cliente.
