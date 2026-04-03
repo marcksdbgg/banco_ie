@@ -9,8 +9,8 @@
 
  **Resumen del sistema:**
  - Frontend: Next.js con App Router + TypeScript + Tailwind CSS (shadcn/ui components).
- - Backend: Supabase Auth + Postgres + Edge Functions (Deno) para lógica crítica transaccional.
- - Despliegue: Vercel (frontend) y Supabase (Edge Functions + DB).
+ - Backend: Auth propio (JWT + bcrypt) + Neon Postgres + API Routes de Next.js para toda la lógica.
+ - Despliegue: Vercel (frontend + API) y Neon (DB). No se usa Supabase.
 
  --
 
@@ -19,9 +19,9 @@
  2. Arquitectura y stack
  3. Esquema de Base de Datos (tablas y relaciones)
  4. Migraciones y funciones almacenadas importantes
- 5. Edge Functions (Supabase)
+ 5. API Routes (reemplazan Edge Functions)
  6. Frontend: estructura, páginas y componentes importantes
- 7. Configuración y despliegue (Vercel & Supabase)
+ 7. Configuración y despliegue (Vercel & Neon)
  8. Desarrollo local
  9. Notas operativas y seguridad
 
@@ -34,66 +34,69 @@
  **2) Arquitectura y stack**
  - Frontend: Next.js (App Router), TypeScript
  - UI: Tailwind CSS, shadcn/ui components
- - Backend: Supabase (Postgres), Supabase Auth
- - Edge Functions: Deno (Supabase Functions) para operaciones sensibles (creación atómica de usuarios, transacciones administrativas)
- - Despliegue: Vercel para la app Next.js; Supabase gestiona DB y funciones
+ - Base de datos: Neon (Postgres serverless) — todas las consultas y datos van a Neon.
+ - Auth: JWT firmado con `jose` (HS256), almacenado en cookie httpOnly. Contraseñas hasheadas con `bcryptjs`.
+ - API Routes de Next.js para operaciones sensibles (creación atómica de usuarios, transacciones administrativas).
+ - Despliegue: Vercel para la app Next.js; Neon para la DB.
 
  **3) Esquema de Base de Datos (resumen completo)**
 
- Ruta en repo para migraciones: `supabase/migrations/`
+ Ruta en repo para migraciones: `supabase/migrations/` (aplícalas en orden numérico en Neon).
 
  Tablas principales (nombre / campos clave / notas):
- - `auth.users` (gestión de usuarios por Supabase Auth)
- - `perfiles` (perfil de usuario)
-     - `id` uuid PRIMARY KEY REFERENCES `auth.users(id)`
-     - `nombre_completo` text
-     - `email` text
-     - `rol` text CHECK (rol IN ('admin','cliente','otro')) — control de autorización (simplificado)
-     - `tipo` text CHECK (tipo IN ('alumno','padre','personal')) — clasificación del cliente dentro de la institución
+ - `usuarios` (credenciales de autenticación)
+     - `id` uuid PRIMARY KEY
+     - `email` text UNIQUE NOT NULL
+     - `password_hash` text NOT NULL — hash bcrypt de la contraseña
      - `created_at` timestamp
+ - `perfiles` (perfil de usuario)
+     - `id` uuid PRIMARY KEY REFERENCES `usuarios(id)` ON DELETE CASCADE
+     - `nombre_completo` text
+     - `rol` text CHECK (rol IN ('admin','cliente'))
+     - `tipo` text CHECK (tipo IN ('alumno','padre','personal')) — clasificación del cliente dentro de la institución
  - `cuentas` (cuentas bancarias)
      - `id` uuid PRIMARY KEY
-     - `usuario_id` uuid REFERENCES `perfiles(id)` UNIQUE
+     - `usuario_id` uuid REFERENCES `perfiles(id)`
      - `numero_cuenta` text UNIQUE — generado vía secuencia `numero_cuenta_seq`
-     - `saldo` numeric (o decimal)
-     - `created_at` timestamp
+     - `saldo_actual` numeric
+     - `fecha_apertura` timestamp
  - `transacciones`
      - `id` uuid PRIMARY KEY
-     - `cuenta_id` uuid REFERENCES `cuentas(id)`
-     - `tipo` text CHECK (tipo IN ('deposito','retiro','transferencia'))
+     - `cuenta_origen_id` uuid REFERENCES `cuentas(id)`
+     - `cuenta_destino_id` uuid REFERENCES `cuentas(id)`
+     - `tipo` text (deposito, retiro, transferencia)
      - `monto` numeric
      - `descripcion` text
-     - `created_at` timestamp
+     - `fecha` timestamp
+ - `amistades` — solicitudes y relaciones de amistad entre usuarios
+ - `notificaciones` — notificaciones para usuarios
 
  Relaciones/constraints importantes:
- - `cuentas.usuario_id` es UNIQUE y FK hacia `perfiles(id)`. Esto garantiza 1:1 perfil->cuenta.
+ - `perfiles.id` es FK hacia `usuarios(id)`. Esto garantiza 1:1 usuario->perfil.
  - `numero_cuenta` se genera mediante la secuencia `numero_cuenta_seq` y la función RPC `create_account_for_user` que inserta la fila en `cuentas` de manera atómica.
 
  **4) Migraciones y funciones almacenadas clave**
- - `001_create_numero_cuenta_seq_and_function.sql` — crea `numero_cuenta_seq` y la función `create_account_for_user(usuario_id uuid, saldo numeric)` que:
-     - genera un `numero_cuenta` único basado en la secuencia,
-     - inserta la cuenta con saldo inicial en una operación atómica,
-     - devuelve la fila creada o lanza error si falla.
- - `002_add_tipo_to_perfiles_and_constraints.sql` — añade la columna `tipo` a `perfiles`, crea constraints y backfill (`tipo='alumno'` por defecto para registros existentes).
+ - `000_create_base_schema.sql` — crea las tablas base (`usuarios`, `perfiles`, `cuentas`, `transacciones`), la secuencia `numero_cuenta_seq`, la función `create_account_for_user`, y la función `realizar_transferencia` (transferencia atómica entre cuentas).
+ - `001_create_numero_cuenta_seq_and_function.sql` — crea/actualiza la secuencia y la función `create_account_for_user`.
+ - `002_add_tipo_to_perfiles_and_constraints.sql` — añade la columna `tipo` a `perfiles`, crea constraints y backfill.
+ - `003_create_friends_and_notifications.sql` — crea las tablas `amistades` y `notificaciones`.
 
- Estas migraciones están en `supabase/migrations/` y deben aplicarse en orden.
+ Estas migraciones están en `supabase/migrations/` y deben aplicarse **en orden** en la base de datos Neon.
 
- **5) Edge Functions (Supabase)**
- Carpeta de funciones en repo: `supabase/functions/`
+ **5) API Routes (reemplazan Edge Functions)**
 
- Funciones más importantes:
- - `crear-usuario-cliente` (`supabase/functions/crear-usuario-cliente/index.ts`)
-     - Propósito: Proveer un único punto de creación para:
-         - crear el usuario en Supabase Auth,
-         - insertar el `perfil` en `perfiles` (incluyendo `tipo` y `rol`),
-         - invocar RPC `create_account_for_user` para crear la `cuenta` de forma atómica,
-         - registrar transacción inicial si aplica.
-     - Seguridad: la función usa `SUPABASE_SERVICE_ROLE_KEY` internamente; para operaciones administrativas puede requerir cabecera `x-admin-secret` o validación de JWT que pertenezca a un `perfil` con rol admin.
-     - Nota: Las llamadas públicas (registro desde UI) siempre crean cuentas con `saldo_inicial=0` y `tipo='alumno'` para evitar privilegios.
+ Todos los endpoints de lógica de negocio son API Routes de Next.js en `src/app/api/`:
 
- - Otras funciones (por proyecto):
-     - `gestionar-fondos` — (si está presente) para operaciones administrativas de ajuste de saldo.
-     - `iniciar-transferencia-cliente` — inicia flujos de transferencia entre cuentas.
+ - `POST /api/auth/login` — autenticación con email/contraseña, establece cookie httpOnly.
+ - `POST /api/auth/logout` — cierra sesión eliminando la cookie.
+ - `GET  /api/auth/me` — retorna el usuario autenticado actual.
+ - `POST /api/functions/crear-usuario-cliente` — crea usuario, perfil y cuenta en Neon de forma atómica.
+ - `POST /api/functions/gestionar-fondos` — operaciones de depósito/retiro (solo admin).
+ - `POST /api/functions/iniciar-transferencia-cliente` — transferencia entre cuentas.
+ - `POST /api/functions/solicitar-amistad` — envía solicitud de amistad.
+ - `POST /api/functions/gestionar-amistad` — acepta/rechaza/elimina amistad.
+ - `POST /api/functions/borrar-usuario-cliente` — elimina usuario y todos sus datos (solo admin).
+ - `POST /api/db/query` — proxy de consultas a Neon para componentes client-side.
 
  **6) Frontend — Estructura y páginas completas**
 
@@ -103,54 +106,44 @@
  - `src/app/page.tsx` — Landing pública.
  - `src/app/auth/`
      - `login/page.tsx` — formulario de inicio de sesión.
-     - `register/page.tsx` — formulario de registro público. Llama a la Edge Function `crear-usuario-cliente` para crear Auth + perfil + cuenta (saldo 0 para registros públicos).
-     - `confirm/route.ts` — endpoint de confirmación (handlers de Supabase Auth callbacks).
-     - `auth-code-error/page.tsx` — página de error para flujos de OAuth o confirmación.
+     - `register/page.tsx` — formulario de registro público. Llama a `/api/functions/crear-usuario-cliente`.
+     - `auth-code-error/page.tsx` — página de error para flujos de auth.
  - `src/app/(cliente)/` — rutas protegidas para clientes (estudiantes):
      - `dashboard/page.tsx` — muestra saldo, actividad reciente.
      - `transferir/page.tsx` — formulario para enviar dinero a otros estudiantes.
  - `src/app/admin/` — panel de administración (protegido por guardas/roles):
      - `page.tsx` — admin dashboard con métricas.
      - `configuracion/page.tsx` — configuración del banco/escuela.
-     - `lista-alumnos/page.tsx` & `page-client.tsx` — listado de estudiantes (client/server variants).
-     - `nuevo-alumno/page.tsx` — formulario para crear alumnos desde admin (invoca directamente la Edge Function `crear-usuario-cliente` usando el SDK de Supabase; ya no existe un proxy server-side por defecto).
- - `src/app/api/drive-scrape/route.ts` — ejemplo de API route para scraping o integración con Google Drive (puede ser un util interno).
+     - `lista-alumnos/page.tsx` & `page-client.tsx` — listado de estudiantes.
+     - `nuevo-alumno/page.tsx` — formulario para crear alumnos desde admin.
 
  Componentes y utilidades clave (`src/components` y `src/lib`):
  - `src/components/admin-guard.tsx` y `client-guard.tsx` — wrappers que protegen rutas según rol.
  - `src/components/ui/*` — componentes UI reutilizables (Button, Input, Table, Dialog, etc.) basados en shadcn/ui.
- - `src/lib/supabase/client.ts` — crea el cliente Supabase para llamadas desde el cliente.
- - `src/lib/supabase/server.ts` — cliente Supabase con credenciales server-side (service role) para llamadas en server code.
- - `src/lib/supabase/middleware.ts` — middleware para verificar sesiones/roles en SSR/server routes.
- - `src/lib/supabase/database.types.ts` — tipos TypeScript generados para tablas (incluye `perfiles.tipo`).
+ - `src/lib/auth/jwt.ts` — firma y verifica JWT con `jose`.
+ - `src/lib/auth/session.ts` — lee la sesión desde la cookie httpOnly (server-side).
+ - `src/lib/supabase/client.ts` — cliente personalizado (sin Supabase SDK) para componentes client-side.
+ - `src/lib/supabase/server.ts` — cliente personalizado para server components; lee sesión de cookie.
+ - `src/lib/neon.ts` — pool de conexiones Neon.
 
- **7) Configuración y despliegue (Vercel & Supabase)**
+ **7) Configuración y despliegue (Vercel & Neon)**
 
- Recomendación: desplegar la app Next.js en Vercel y las Edge Functions ya son desplegadas desde la carpeta `supabase/functions` usando la CLI o la integración de Supabase.
-
- Variables de entorno (importantes):
- - Para Vercel (frontend):
-     - `NEXT_PUBLIC_SUPABASE_URL` — URL del proyecto Supabase.
-     - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anon public key (solo para client SDK).
- - Para server-side (Vercel/Server routes):
-     - `SUPABASE_SERVICE_ROLE_KEY` — clave con privilegios server (NO exponer al cliente).
-    - `ADMIN_CREATE_SECRET` — (opcional/legacy) secreto que se usaba cuando se proxyaba la llamada a través de un endpoint server-side. Con la llamada directa desde el admin UI a la Edge Function, este secreto no es estrictamente necesario; la función valida Authorization Bearer tokens o `x-admin-secret` si configurado.
- - Para Supabase Functions (en el dashboard de Supabase):
-     - `SUPABASE_URL`
-     - `SUPABASE_ANON_KEY`
-     - `SUPABASE_SERVICE_ROLE_KEY` (en variables de función; necesario para crear usuarios y manipular DB)
-    - `ADMIN_CREATE_SECRET` (opcional) — si quieres que la Edge Function permita una segunda vía de autenticación administrativa basada en un secreto compartido (por ejemplo para proxies o sistemas externos), puedes configurar `ADMIN_CREATE_SECRET` en las variables de la función. No es obligatorio cuando la UI usa el SDK y pasa Authorization Bearer tokens.
+ Variables de entorno requeridas (Vercel):
+ ```
+ DATABASE_URL=<neon_connection_string>
+ JWT_SECRET=<secret_aleatorio_minimo_32_chars>
+ ```
 
  Despliegue recomendado:
- 1. Aplicar migraciones en Supabase (ordenadas): `supabase/migrations/001_...`, luego `002_...`.
- 2. Desplegar Edge Functions con `supabase functions deploy crear-usuario-cliente --project-ref <ref>` o usando la UI.
- 3. Desplegar Next.js a Vercel. Configurar variables de entorno en Vercel siguiendo las claves indicadas.
+ 1. Crear una base de datos en Neon.
+ 2. Aplicar las migraciones en Neon (en orden): `000_create_base_schema.sql`, luego `001_...`, `002_...`, `003_...`.
+ 3. Desplegar Next.js a Vercel. Configurar las variables de entorno `DATABASE_URL` y `JWT_SECRET`.
 
  **8) Desarrollo local**
 
  Requisitos:
  - Node.js (versión usada en proyecto, ver `package.json`), npm >= 8
- - Acceso a un proyecto Supabase (URL + anon/service role keys)
+ - Acceso a una base de datos Neon (connection string)
 
  Pasos rápidos:
  - Instala dependencias:
@@ -159,11 +152,8 @@
  ```
  - Variables locales: crea un `.env.local` con:
  ```
- NEXT_PUBLIC_SUPABASE_URL=<your_supabase_url>
- NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_anon_key>
- SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
-# ADMIN_CREATE_SECRET is optional and only needed if you use a proxy flow
-# ADMIN_CREATE_SECRET=<random_secret_for_admin_calls>
+ DATABASE_URL=<your_neon_connection_string>
+ JWT_SECRET=<random_secret_at_least_32_characters>
  ```
  - Desarrollar en local:
  ```powershell
@@ -176,9 +166,10 @@
  ```
 
  **9) Notas operativas y seguridad**
- - Nunca expongas `SUPABASE_SERVICE_ROLE_KEY` ni `ADMIN_CREATE_SECRET` en clientes.
- - Las llamadas administrativas deben pasar por una ruta server-side que valide la sesión y reenvíe la petición a la función con el secreto.
+ - `JWT_SECRET` debe ser una cadena aleatoria larga (mínimo 32 caracteres). Nunca expongas este valor.
+ - Las cookies de sesión son `httpOnly` y `sameSite: lax` — no son accesibles desde JavaScript del cliente.
  - Las registraciones públicas se limitan a `tipo='alumno'` y `saldo_inicial=0`.
+ - Todas las operaciones administrativas (gestionar-fondos, borrar-usuario-cliente) validan que el usuario tenga `rol='admin'` en la tabla `perfiles` antes de ejecutarse.
 
  --
 
@@ -196,16 +187,11 @@
  │  ├─ components/
  │  └─ lib/
  ├─ supabase/
- │  ├─ functions/
+ │  ├─ functions/   (legacy, ya no se usan - reemplazadas por API Routes)
  │  └─ migrations/
  ├─ package.json
  └─ README.md (este archivo)
  ```
-
- Si quieres, puedo:
- - Expandir la sección de esquema de la base de datos con los SQL exactos de cada migración (copiar/pegar el contenido de `supabase/migrations/*`).
- - Añadir una sección de troubleshooting con errores comunes y cómo verificarlos en Supabase.
- - Crear un archivo `DEVELOPMENT.md` con pasos de despliegue automatizados.
 
  ¿Qué prefieres que añada a continuación? (Puedo incluir las migraciones completas y describir cada columna y constraint en detalle.)
 
@@ -327,5 +313,4 @@ Flujo principal que implementa la función:
 9. Si `saldo_inicial > 0` registra una transacción inicial en `transacciones`.
 10. Devuelve 201 en caso de éxito con `{ userId, message }`, o 400 con `{ error }` en error.
 
-Nota de seguridad: la función requiere `SUPABASE_SERVICE_ROLE_KEY` en sus env vars; en producción asegúrate de guardarla en el dashboard de Supabase y no en el repositorio.
-
+Nota de seguridad: la ruta API requiere `SUPABASE_SERVICE_ROLE_KEY` para operaciones administrativas de Auth; en producción debe almacenarse como variable de entorno del backend (por ejemplo en Vercel), nunca en el repositorio ni en el cliente.

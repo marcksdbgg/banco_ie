@@ -49,9 +49,9 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      
-      const { data, error: invokeError } = await supabase.functions.invoke('crear-usuario-cliente', {
+      const client = createClient();
+
+      const { data, error: invokeError } = await client.functions.invoke('crear-usuario-cliente', {
         body: { 
           nombre_completo: formData.fullName, 
           email: formData.email, 

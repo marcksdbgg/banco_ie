@@ -26,20 +26,17 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
+    const client = createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error: loginError } = await client.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      setError(error.message);
+    if (loginError) {
+      setError(loginError.message);
       setLoading(false);
     } else {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await client.auth.getUser();
       if (user) {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await client
           .from('perfiles')
           .select('rol')
           .eq('id', user.id)
@@ -54,7 +51,7 @@ export default function LoginPage() {
           } else {
             router.push('/dashboard');
           }
-          router.refresh(); 
+          router.refresh();
         }
       } else {
         setError("No se pudo obtener la información del usuario.");

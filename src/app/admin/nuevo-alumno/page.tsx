@@ -57,9 +57,6 @@ export default function NuevoAlumnoPage() {
     setErrors({});
       
     try {
-      // CORRECCIÓN: Llamamos directamente a la Edge Function usando el SDK de Supabase.
-      // El SDK se encargará de adjuntar el token de autorización del administrador logueado,
-      // permitiendo a la Edge Function validar el rol y ejecutar la lógica privilegiada.
       const supabase = createClient();
 
       const { data, error: invokeError } = await supabase.functions.invoke('crear-usuario-cliente', {
