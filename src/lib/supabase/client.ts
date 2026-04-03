@@ -1,28 +1,41 @@
-import { createBrowserClient } from '@supabase/ssr'
 import { createDbFromFactory } from '@/lib/db/query-builder'
 import { executeClientQuery } from '@/lib/db/client-query-executor'
 
-export function createClient() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+type AuthUser = {
+  id: string
+  email: string
+  user_metadata: { nombre_completo?: string }
+}
 
+export function createClient() {
   return {
-    ...supabase,
+    auth: {
+      signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        const data = await res.json()
+        if (!res.ok) return { error: { message: data.error ?? 'Error al iniciar sesión' } }
+        return { error: null }
+      },
+      signOut: async () => {
+        await fetch('/api/auth/logout', { method: 'POST' })
+        return { error: null }
+      },
+      getUser: async (): Promise<{ data: { user: AuthUser | null }; error: null }> => {
+        const res = await fetch('/api/auth/me')
+        const data = await res.json()
+        return { data: { user: data.user ?? null }, error: null }
+      },
+    },
     from: createDbFromFactory(executeClientQuery),
     functions: {
-      ...supabase.functions,
       invoke: async (name: string, options?: { body?: unknown }) => {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData.session?.access_token
-
         const response = await fetch(`/api/functions/${name}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(options?.body ?? {}),
         })
 

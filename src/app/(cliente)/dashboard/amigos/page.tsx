@@ -11,7 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UserPlus, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import type { User } from '@supabase/supabase-js';
+
+type AuthUser = {
+    id: string;
+    email: string;
+    user_metadata: { nombre_completo?: string };
+};
 
 type Amistad = {
     id: number;
@@ -23,15 +28,13 @@ type Amistad = {
 export default function AmigosPage() {
     const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<AuthUser | null>(null);
     const [amistades, setAmistades] = useState<Amistad[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [numeroCuenta, setNumeroCuenta] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const supabase = createClient();
 
     type QueryRow = {
         id: number;
@@ -42,7 +45,8 @@ export default function AmigosPage() {
 
     const fetchAmistades = useCallback(async (userId: string) => {
         setLoading(true);
-        const { data, error } = await supabase
+        const client = createClient();
+        const { data, error } = await client
             .from('amistades')
             .select(`
                 id,
@@ -57,7 +61,6 @@ export default function AmigosPage() {
             setError('Error al cargar la lista de amigos.');
             console.error(error);
         } else {
-            // map arrays to single objects (Supabase can return nested arrays)
             const rows = (data as QueryRow[] || []).map(r => ({
                 id: r.id,
                 estado: r.estado,
@@ -67,18 +70,19 @@ export default function AmigosPage() {
             setAmistades(rows);
         }
         setLoading(false);
-    }, [supabase]);
+    }, []);
 
     useEffect(() => {
         const init = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const client = createClient();
+            const { data: { user } } = await client.auth.getUser();
             if (user) {
                 setUser(user);
                 await fetchAmistades(user.id);
             }
         };
         init();
-    }, [fetchAmistades, supabase]);
+    }, [fetchAmistades]);
 
     const handleAddFriend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -86,7 +90,8 @@ export default function AmigosPage() {
         setError('');
         setSuccess('');
 
-        const { data, error } = await supabase.functions.invoke('solicitar-amistad', {
+        const client = createClient();
+        const { data, error } = await client.functions.invoke('solicitar-amistad', {
             body: { numero_cuenta_amigo: numeroCuenta },
         });
         
@@ -101,7 +106,8 @@ export default function AmigosPage() {
     };
     
     const handleManageRequest = async (amistad_id: number, accion: 'aceptar' | 'rechazar' | 'eliminar') => {
-        const { data, error } = await supabase.functions.invoke('gestionar-amistad', {
+        const client = createClient();
+        const { data, error } = await client.functions.invoke('gestionar-amistad', {
             body: { amistad_id, accion },
         });
 

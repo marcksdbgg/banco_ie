@@ -1,22 +1,12 @@
 import { NextResponse } from 'next/server'
 import { executeNeonQuery } from '@/lib/db/neon-query-executor'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { pool } from '@/lib/neon'
+import { getSession } from '@/lib/auth/session'
 import type { DbQueryState } from '@/lib/db/query-builder'
 
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-async function getAuthUserId(req: Request) {
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.split(' ')[1]
-  const {
-    data: { user },
-  } = await supabaseAdmin.auth.getUser(token)
-  return user?.id ?? null
+async function getAuthUserId(): Promise<string | null> {
+  const session = await getSession()
+  return session?.sub ?? null
 }
 
 async function isAdmin(userId: string) {
@@ -83,7 +73,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid query state' }, { status: 400 })
     }
 
-    const userId = await getAuthUserId(req)
+    const userId = await getAuthUserId()
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

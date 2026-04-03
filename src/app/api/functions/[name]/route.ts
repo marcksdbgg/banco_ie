@@ -1,22 +1,23 @@
 import { NextResponse } from 'next/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { pool } from '@/lib/neon'
+import { getSession } from '@/lib/auth/session'
+import bcrypt from 'bcryptjs'
 
 type AuthUser = { id: string; user_metadata?: { nombre_completo?: string } }
 
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-async function getAuthUser(req: Request): Promise<AuthUser | null> {
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.split(' ')[1]
-  const {
-    data: { user },
-  } = await supabaseAdmin.auth.getUser(token)
-  return user ? ({ id: user.id, user_metadata: user.user_metadata as AuthUser['user_metadata'] } as AuthUser) : null
+async function getAuthUser(): Promise<AuthUser | null> {
+  const session = await getSession()
+  if (!session) return null
+  const result = await pool.query(
+    `SELECT u.id, p.nombre_completo
+     FROM usuarios u
+     LEFT JOIN perfiles p ON p.id = u.id
+     WHERE u.id = $1 LIMIT 1`,
+    [session.sub]
+  )
+  const row = result.rows[0]
+  if (!row) return null
+  return { id: row.id, user_metadata: { nombre_completo: row.nombre_completo ?? '' } }
 }
 
 async function isAdmin(userId: string) {
@@ -30,7 +31,7 @@ async function crearUsuarioCliente(req: Request) {
   let { saldo_inicial, rol, tipo } = body
   saldo_inicial = Number(saldo_inicial) || 0
 
-  const user = await getAuthUser(req)
+  const user = await getAuthUser()
   const isAdminCall = user ? await isAdmin(user.id) : false
   const validTipos = ['alumno', 'padre', 'personal']
 
@@ -43,22 +44,22 @@ async function crearUsuarioCliente(req: Request) {
     if (!validTipos.includes(tipo)) tipo = 'alumno'
   }
 
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { nombre_completo },
-  })
-  if (authError || !authData.user) throw new Error(authError?.message ?? 'No se pudo crear usuario')
+  const passwordHash = await bcrypt.hash(password, 12)
+  const usuarioResult = await pool.query(
+    `INSERT INTO usuarios (email, password_hash) VALUES ($1, $2) RETURNING id`,
+    [email, passwordHash]
+  )
+  const newUserId: string = usuarioResult.rows[0]?.id
+  if (!newUserId) throw new Error('No se pudo crear el usuario')
 
   try {
     await pool.query(
       `INSERT INTO perfiles (id, nombre_completo, rol, tipo) VALUES ($1, $2, $3, $4)`,
-      [authData.user.id, nombre_completo, rol, tipo]
+      [newUserId, nombre_completo, rol, tipo]
     )
 
     const accountResult = await pool.query(`SELECT * FROM create_account_for_user($1::uuid, $2::numeric)`, [
-      authData.user.id,
+      newUserId,
       saldo_inicial,
     ])
     const cuenta = accountResult.rows[0]
@@ -72,17 +73,17 @@ async function crearUsuarioCliente(req: Request) {
     }
 
     return NextResponse.json(
-      { message: 'Usuario y cuenta creados exitosamente.', userId: authData.user.id, cuentaId: cuenta?.id ?? null },
+      { message: 'Usuario y cuenta creados exitosamente.', userId: newUserId, cuentaId: cuenta?.id ?? null },
       { status: 201 }
     )
   } catch (error) {
-    await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+    await pool.query(`DELETE FROM usuarios WHERE id = $1`, [newUserId])
     throw error
   }
 }
 
 async function gestionarFondos(req: Request) {
-  const user = await getAuthUser(req)
+  const user = await getAuthUser()
   if (!user || !(await isAdmin(user.id))) throw new Error('No autorizado')
 
   const { tipo, cuenta_id, monto } = await req.json()
@@ -116,7 +117,7 @@ async function gestionarFondos(req: Request) {
 }
 
 async function iniciarTransferenciaCliente(req: Request) {
-  const user = await getAuthUser(req)
+  const user = await getAuthUser()
   if (!user) throw new Error('Usuario no autenticado.')
 
   const { numero_cuenta_destino, monto } = await req.json()
@@ -137,7 +138,7 @@ async function iniciarTransferenciaCliente(req: Request) {
 }
 
 async function solicitarAmistad(req: Request) {
-  const user = await getAuthUser(req)
+  const user = await getAuthUser()
   if (!user) throw new Error('Autenticación requerida.')
 
   const { numero_cuenta_amigo } = await req.json()
@@ -177,7 +178,7 @@ async function solicitarAmistad(req: Request) {
 }
 
 async function gestionarAmistad(req: Request) {
-  const user = await getAuthUser(req)
+  const user = await getAuthUser()
   if (!user) throw new Error('Autenticación requerida.')
 
   const { amistad_id, accion } = await req.json()
@@ -205,7 +206,7 @@ async function gestionarAmistad(req: Request) {
 }
 
 async function borrarUsuarioCliente(req: Request) {
-  const user = await getAuthUser(req)
+  const user = await getAuthUser()
   if (!user || !(await isAdmin(user.id))) throw new Error('No autorizado: el usuario no tiene privilegios de administrador.')
 
   const { userId } = await req.json()
@@ -222,6 +223,7 @@ async function borrarUsuarioCliente(req: Request) {
       await client.query(`DELETE FROM cuentas WHERE usuario_id = $1`, [userId])
     }
     await client.query(`DELETE FROM perfiles WHERE id = $1`, [userId])
+    await client.query(`DELETE FROM usuarios WHERE id = $1`, [userId])
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')
@@ -229,9 +231,6 @@ async function borrarUsuarioCliente(req: Request) {
   } finally {
     client.release()
   }
-
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
-  if (error) throw new Error(error.message)
 
   return NextResponse.json({ message: 'Usuario eliminado exitosamente' })
 }
