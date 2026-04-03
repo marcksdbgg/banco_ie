@@ -61,7 +61,7 @@ export default function AmigosPage() {
             setError('Error al cargar la lista de amigos.');
             console.error(error);
         } else {
-            const rows = (data as QueryRow[] || []).map(r => ({
+            const rows = (Array.isArray(data) ? data as QueryRow[] : []).map(r => ({
                 id: r.id,
                 estado: r.estado,
                 solicitante: Array.isArray(r.solicitante) ? r.solicitante[0] : (r.solicitante ?? { id: '', nombre_completo: '' }),
